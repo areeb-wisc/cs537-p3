@@ -20,3 +20,9 @@ $(TARGET)-dbg: $(SRC) $(HEADER)
 
 clean:
 	rm -f $(TARGET) $(TARGET)-dbg
+
+dict: dict.c
+	$(CC) $(CFLAGS) $< -o $@
+
+envtest: envtest.c
+	$(CC) $(CFLAGS) $< -o $@

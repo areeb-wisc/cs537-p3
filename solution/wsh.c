@@ -15,6 +15,15 @@ char* wsh_prompt = "wsh> ";
 int n_builtins = 7;
 char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 
+// Clone a string
+char* clone_str(char* str) {
+    char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
+    strcpy(clone, str);
+    return(clone);
+}
+
+/******************************* DICTIONATY START *****************************/
+
 typedef struct Entry {
     char* key;
     char* val;
@@ -28,23 +37,6 @@ typedef struct Dict {
 } dict;
 
 dict* shell_vars;
-
-void print_shell_vars() {
-    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
-    printf("{");
-    for (int i = 0; i < shell_vars->size; i++) {
-        entry* dict_entry = shell_vars->entries[i];
-        printf("%s:%s,", dict_entry->key, dict_entry->val);
-    }
-    printf("}\n");
-}
-
-// Clone a string
-char* clone_str(char* str) {
-    char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
-    strcpy(clone, str);
-    return(clone);
-}
 
 // Return index of key in dictionary if present, else -1 
 int get_idx(char* key) {
@@ -85,6 +77,21 @@ char* get_val(char* key) {
     return shell_vars->entries[idx]->val;
 }
 
+// TODO(Areeb): remove this later
+void print_shell_vars() {
+    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
+    printf("{");
+    for (int i = 0; i < shell_vars->size; i++) {
+        entry* dict_entry = shell_vars->entries[i];
+        printf("%s:%s,", dict_entry->key, dict_entry->val);
+    }
+    printf("}\n");
+}
+
+/********************************** DICTIONATY END *******************************/
+
+/******************************* STRING HELPERS START ****************************/
+
 void strip(char** word, ssize_t* len) {
     if (*len > 0) {
         int i = 0, j = *len - 1;
@@ -119,22 +126,6 @@ void promptf(char* fmtstr, ...) {
 }
 
 /**
- * Return index at which word is present in list, else -1
- */
-int is_word_in_list(char** list, int size, char* word) {
-    for (int i = 0; i < size; i++) {
-        if (strcmp(list[i], word) == 0) // found
-            return i;
-    }
-    return -1;
-}
-
-bool is_builtin(char* command) {
-    int idx = is_word_in_list(builtins, n_builtins, command);
-    return (idx >=0 && idx < n_builtins);
-}
-
-/**
  * Tokenize the given input string using delimiter = ' '
  * Also appends a NULL to the output array for exec argv
  * e.g.
@@ -164,6 +155,26 @@ void tokenize(char* line, char*** ptokens, int* n_tokens) {
     *n_tokens = buff_size + 1; // size includes NULL
 }
 
+/**************************** STRING HELPERS END *************************/
+
+/**
+ * Return index at which word is present in list, else -1
+ */
+int is_word_in_list(char** list, int size, char* word) {
+    for (int i = 0; i < size; i++) {
+        if (strcmp(list[i], word) == 0) // found
+            return i;
+    }
+    return -1;
+}
+
+bool is_builtin(char* command) {
+    int idx = is_word_in_list(builtins, n_builtins, command);
+    return (idx >=0 && idx < n_builtins);
+}
+
+/******************** VARNAME DEREFERENCING HELPERS START *******************/
+
 char* dereference(char* varname) {
     if (varname[0] != '$')
         return varname;
@@ -171,27 +182,53 @@ char* dereference(char* varname) {
     return out ? out : "";
 }
 
-char** dereference(char** varnames, int n_varnames) {
+char** dereferences(char** varnames, int n_varnames) {
     char** out = (char**)malloc(n_varnames * sizeof(char*));
     for (int i = 0; i < n_varnames; i++)
         out[i] = clone_str(dereference(varnames[i]));
     return out;
 }
 
-void export(char* token) {
+/********************* VARNAME DEREFERENCING HELPERS END ********************/
+
+/*************************** BUILT-IN CALLS START ***************************/
+
+void wsh_cd() {
+
+}
+
+void wsh_exit() {
+
+}
+
+void wsh_export(char* token) {
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));
     setenv(key, val, 1);
     printf("getenv(%s)=%s\n", key, getenv(key));
 }
 
-void local(char* token) {
+void wsh_history() {
+
+}
+
+void wsh_local(char* token) {
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
     add_entry(key, val);
     print_shell_vars();
 }
+
+void wsh_ls() {
+
+}
+
+void wsh_vars() {
+
+}
+
+/*************************** BUILT-IN CALLS END ****************************/
 
 void init_shell_vars() {
     shell_vars = (dict*)malloc(sizeof(dict));
@@ -259,11 +296,11 @@ int main(int argc, char* argv[]) {
         }
 
         if (strcmp(command, "local") == 0) {
-            local(tokens[1]);
+            wsh_local(tokens[1]);
         }
 
         if (strcmp(command, "export") == 0) {
-            export(tokens[1]);
+            wsh_export(tokens[1]);
             int pid = fork();
             if (pid < 0)
                 printf("fork failed!!\n");

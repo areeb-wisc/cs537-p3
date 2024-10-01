@@ -29,6 +29,16 @@ typedef struct Dict {
 
 dict* shell_vars;
 
+void print_shell_vars() {
+    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
+    printf("{");
+    for (int i = 0; i < shell_vars->size; i++) {
+        entry* dict_entry = shell_vars->entries[i];
+        printf("%s:%s,", dict_entry->key, dict_entry->val);
+    }
+    printf("}\n");
+}
+
 // Clone a string
 char* clone_str(char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -66,8 +76,11 @@ void add_entry(char* key, char* val) {
 }
 
 char* get_val(char* key) {
+    char* env_result = getenv(key);
+    if (env_result != NULL) // var present in env variables
+        return env_result;
     int idx = get_idx(key);
-    if (idx == -1)
+    if (idx == -1) // var not defined yet
         return NULL;
     return shell_vars->entries[idx]->val;
 }
@@ -151,22 +164,26 @@ void tokenize(char* line, char*** ptokens, int* n_tokens) {
     *n_tokens = buff_size + 1; // size includes NULL
 }
 
+char* dereference(char* varname) {
+    if (varname[0] != '$')
+        return varname;
+    char* out = get_val(++varname);
+    return out ? out : "";
+}
+
+void export(char* token) {
+    char* key = strtok(token, "=");
+    char* val = dereference(strtok(NULL, "="));
+    setenv(key, val, 1);
+    printf("getenv(%s)=%s\n", key, getenv(key));
+}
+
 void local(char* token) {
     char* key = strtok(token, "=");
-    char* val = strtok(NULL, "=");
+    char* val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
     add_entry(key, val);
     print_shell_vars();
-}
-
-void print_shell_vars() {
-    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
-    printf("{");
-    for (int i = 0; i < shell_vars->size; i++) {
-        entry* dict_entry = shell_vars->entries[i];
-        printf("%s:%s,", dict_entry->key, dict_entry->val);
-    }
-    printf("}\n");
 }
 
 void init_shell_vars() {
@@ -238,22 +255,43 @@ int main(int argc, char* argv[]) {
             local(tokens[1]);
         }
 
+        if (strcmp(command, "export") == 0) {
+            export(tokens[1]);
+            int pid = fork();
+            if (pid < 0)
+                printf("fork failed!!\n");
+            else if (pid == 0) {
+                printf("IN child\n");
+                printf("getenv(dd)=%s\n", getenv("dd"));
+                printf("Child of wsh, exec into ls\n");
+                char* argv[] = {"ls", "-1", NULL};
+                execv("/bin/ls", argv);
+                printf("exec failed\n");
+                exit(EXIT_FAILURE);
+            } else {
+                int status = 0;;
+                wait(&status);
+                printf("child complete, status=%d!\n", status);
+                printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+            }
+        }
+
         // if (strcmp(command, "ls") == 0) {
-        //     int pid = fork();
-        //     if (pid < 0)
-        //         printf("fork failed!!\n");
-        //     else if (pid == 0) {
-        //         printf("Child of wsh, exec into ls\n");
-        //         char** argv = tokens;
-        //         execv("/bin/ls", argv);
-        //         printf("exec failed\n");
-        //         exit(EXIT_FAILURE);
-        //     } else {
-        //         int status = 0;;
-        //         wait(&status);
-        //         printf("child complete, status=%d!\n", status);
-        //         printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-        //     }
+            // int pid = fork();
+            // if (pid < 0)
+            //     printf("fork failed!!\n");
+            // else if (pid == 0) {
+            //     printf("Child of wsh, exec into ls\n");
+            //     char** argv = tokens;
+            //     execv("/bin/ls", argv);
+            //     printf("exec failed\n");
+            //     exit(EXIT_FAILURE);
+            // } else {
+            //     int status = 0;;
+            //     wait(&status);
+            //     printf("child complete, status=%d!\n", status);
+            //     printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+            // }
         // }
 
         promptf("");

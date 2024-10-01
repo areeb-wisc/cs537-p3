@@ -35,9 +35,9 @@ char* clone_str(char* str) {
 }
 
 // Return index of key in dictionary if present, else -1 
-int get_idx(dict* my_dict, char* key) {
-    for (int i = 0; i < my_dict->size; i++) {
-        if (strcmp(my_dict->entries[i]->key, key) == 0)
+int get_idx(dict* shell_vars, char* key) {
+    for (int i = 0; i < shell_vars->size; i++) {
+        if (strcmp(shell_vars->entries[i]->key, key) == 0)
             return i;
     }
     return -1;
@@ -50,24 +50,24 @@ entry* make_entry(char* key, char* val) {
     return new_entry;
 }
 
-void add_entry(dict* my_dict, char* key, char* val) {
-    int idx = get_idx(my_dict, key);
+void add_entry(dict* shell_vars, char* key, char* val) {
+    int idx = get_idx(shell_vars, key);
     if (idx == -1) { // add new entry
-        my_dict->size++;
-        if (my_dict->size > my_dict->max_size) {
-            my_dict->max_size *= 2;
-            my_dict->entries = (entry**)realloc(my_dict->entries, my_dict->max_size * sizeof(entry*));
+        shell_vars->size++;
+        if (shell_vars->size > shell_vars->max_size) {
+            shell_vars->max_size *= 2;
+            shell_vars->entries = (entry**)realloc(shell_vars->entries, shell_vars->max_size * sizeof(entry*));
         }
-        my_dict->entries[my_dict->size - 1] = make_entry(key, val);
+        shell_vars->entries[shell_vars->size - 1] = make_entry(key, val);
     } else // update existing entry
-        my_dict->entries[idx]->val = clone_str(val);
+        shell_vars->entries[idx]->val = clone_str(val);
 }
 
-char* get_val(dict* my_dict, char* key) {
-    int idx = get_idx(my_dict, key);
+char* get_val(dict* shell_vars, char* key) {
+    int idx = get_idx(shell_vars, key);
     if (idx == -1)
         return NULL;
-    return my_dict->entries[idx]->val;
+    return shell_vars->entries[idx]->val;
 }
 
 void strip(char** word, ssize_t* len) {
@@ -149,15 +149,25 @@ void tokenize(char* line, char*** ptokens, int* n_tokens) {
     *n_tokens = buff_size + 1; // size includes NULL
 }
 
-void print_dict(dict* my_dict) {
-    printf("size=%d, max_size=%d, dict=", my_dict->size, my_dict->max_size);
+void print_dict(dict* shell_vars) {
+    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
     printf("{");
-    for (int i = 0; i < my_dict->size; i++) {
-        entry* dict_entry = my_dict->entries[i];
+    for (int i = 0; i < shell_vars->size; i++) {
+        entry* dict_entry = shell_vars->entries[i];
         printf("%s:%s,", dict_entry->key, dict_entry->val);
     }
     printf("}\n");
 }
+
+dict* shell_vars;
+
+void local(char* token) {
+    char* key = strtok(token, "=");
+    char* val = strtok(NULL, "=");
+    add_entry(shell_vars, key, val);
+    print_dict(shell_vars);
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -174,9 +184,11 @@ int main(int argc, char* argv[]) {
         wsh_prompt = "";
     }
 
-    dict* shell_variables = (dict*)malloc(sizeof(dict));
+    dict shvars;
+    shell_vars = &shvars;
+    //  = (dict*)malloc(sizeof(dict));
 
-    print_dict(shell_variables);
+    print_dict(shell_vars);
 
     char *line = NULL;
     size_t len = 0;
@@ -216,6 +228,10 @@ int main(int argc, char* argv[]) {
 
         if (!is_builtin(command)) { // 
 
+        }
+
+        if (strcmp(command, "local") == 0) {
+            local(tokens[1]);
         }
 
         // if (strcmp(command, "ls") == 0) {

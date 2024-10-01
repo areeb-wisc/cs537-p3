@@ -81,7 +81,16 @@ char* get_var(char* key) {
     return (env_result != NULL) ? env_result : get_shell_var(key);
 }
 
-// TODO(Areeb): remove this later
+
+// TODO(Areeb): remove these later
+void print_environ() {
+    printf("environ=");
+    printf("{");
+    for (int i = 0; environ[i] != NULL; i++)
+        printf("%s,", environ[i]);
+    printf("}\n");
+}
+
 void print_shell_vars() {
     printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
     printf("{");
@@ -90,6 +99,11 @@ void print_shell_vars() {
         printf("%s:%s,", dict_entry->key, dict_entry->val);
     }
     printf("}\n");
+}
+
+void print_vars() {
+    print_environ();
+    print_shell_vars();
 }
 
 /********************************** DICTIONARY END *******************************/
@@ -136,13 +150,16 @@ void promptf(char* fmtstr, ...) {
  * Input: "echo hello world"
  * Output: {"echo", "hello", "world", NULL}
  */
-void tokenize(char* line, char*** ptokens, int* n_tokens) {
-    
+void tokenize(const char* oline, char*** ptokens, int* n_tokens) {
+    char* line = clone_str(oline);
+    printf("tokenize\n");
     int buff_size = 0;
     int max_buff_size = 1;
     char** tokens = (char**)malloc(buff_size * sizeof(char*));
 
+    printf("right before strtok\n");
     char* token = strtok(line, " ");
+    printf("right after strtok\n");
     while (token != NULL) {
         buff_size++;
         if (buff_size > max_buff_size) {
@@ -157,6 +174,7 @@ void tokenize(char* line, char*** ptokens, int* n_tokens) {
 
     *ptokens = tokens; // list of all token strings (including NULL)
     *n_tokens = buff_size + 1; // size includes NULL
+    printf("tokenize complete\n");
 }
 
 /**************************** STRING HELPERS END *************************/
@@ -205,23 +223,28 @@ void wsh_exit() {
 
 }
 
-void wsh_export(char* token) {
+void wsh_export(const char* otoken) {
+    char* token = clone_str(otoken);
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));
     setenv(key, val, 1);
-    printf("getenv(%s)=%s\n", key, getenv(key));
+    printf("exported getenv(%s)=%s\n", key, getenv(key));
+    print_vars();
 }
 
 void wsh_history() {
 
 }
 
-void wsh_local(char* token) {
+void wsh_local(const char* otoken) {
+    char* token = clone_str(otoken);
+    printf("wsh_local(%s)\n", token);
     char* key = strtok(token, "=");
+    printf("wsh_local key=%s\n", key);
     char* val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
     add_shell_var(key, val);
-    print_shell_vars();
+    print_vars();
 }
 
 void wsh_ls() {
@@ -257,7 +280,7 @@ int main(int argc, char* argv[]) {
     }
 
     init_shell_vars();
-    print_shell_vars();
+    print_vars();
 
     char *line = NULL;
     size_t len = 0;
@@ -310,9 +333,17 @@ int main(int argc, char* argv[]) {
                 printf("fork failed!!\n");
             else if (pid == 0) {
                 printf("IN child\n");
+                printf("get_shell_var(aa)=%s\n", get_shell_var("aa"));
+                printf("attempting segfsult\n");
+                char* aa = "local aa=100";
+                char** bb = NULL;
+                int cc = 0;
+                tokenize(aa, &bb, &cc);
+                wsh_local(bb[1]);
+                printf("still in child get_shell_var(aa)=%s\n", get_shell_var("aa"));
                 printf("getenv(dd)=%s\n", getenv("dd"));
                 printf("Child of wsh, exec into ls\n");
-                char* argv[] = {"ls", "-1", NULL};
+                char* argv[] = {"ls", "-A", NULL};
                 execv("/bin/ls", argv);
                 printf("exec failed\n");
                 exit(EXIT_FAILURE);
@@ -320,7 +351,14 @@ int main(int argc, char* argv[]) {
                 int status = 0;;
                 wait(&status);
                 printf("child complete, status=%d!\n", status);
+                printf("WIFEXITED=%d\n", WIFEXITED(status));
                 printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+                printf("WIFSIGNALED=%d\n", WIFSIGNALED(status));
+                printf("WTERMSIG=%d\n", WTERMSIG(status));
+                printf("WIFSTOPPED=%d\n", WIFSTOPPED(status));
+                printf("WSTOPSIG=%d\n", WSTOPSIG(status));
+                printf("WIFCONTINUED=%d\n", WIFCONTINUED(status));
+                printf("in parent get_shell_var(aa)=%s\n", get_shell_var("aa"));
             }
         }
 
@@ -349,3 +387,13 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+/**
+ * cd dir1 $dir2
+ * export key1=val1
+ * export key1=$var1
+ * exit
+ * 
+ * 
+ * 
+ */

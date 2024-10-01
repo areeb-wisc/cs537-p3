@@ -171,6 +171,13 @@ char* dereference(char* varname) {
     return out ? out : "";
 }
 
+char** dereference(char** varnames, int n_varnames) {
+    char** out = (char**)malloc(n_varnames * sizeof(char*));
+    for (int i = 0; i < n_varnames; i++)
+        out[i] = clone_str(dereference(varnames[i]));
+    return out;
+}
+
 void export(char* token) {
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));

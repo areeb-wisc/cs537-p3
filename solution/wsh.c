@@ -16,7 +16,7 @@ int n_builtins = 7;
 char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 
 // Clone a string
-char* clone_str(char* str) {
+char* clone_str(const char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
     strcpy(clone, str);
     return(clone);
@@ -39,7 +39,7 @@ typedef struct Dict {
 dict* shell_vars;
 
 // Return index of key in dictionary if present, else -1 
-int get_shell_var_idx(char* key) {
+int get_shell_var_idx(const char* key) {
     for (int i = 0; i < shell_vars->size; i++) {
         if (strcmp(shell_vars->entries[i]->key, key) == 0)
             return i;
@@ -47,7 +47,7 @@ int get_shell_var_idx(char* key) {
     return -1;
 }
 
-entry* make_shell_var_entry(char* key, char* val) {
+entry* make_shell_var_entry(const char* key, const char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
     new_entry->val = clone_str(val);
@@ -61,7 +61,7 @@ void resize_if_needed() {
     }
 }
 
-void add_shell_var(char* key, char* val) {
+void add_shell_var(const char* key, const char* val) {
     int idx = get_shell_var_idx(key);
     if (idx == -1) { // add new entry
         shell_vars->size++;
@@ -71,12 +71,12 @@ void add_shell_var(char* key, char* val) {
         shell_vars->entries[idx]->val = clone_str(val);
 }
 
-char* get_shell_var(char* key) {
+char* get_shell_var(const char* key) {
     int idx = get_shell_var_idx(key);
     return (idx != -1) ? shell_vars->entries[idx]->val : NULL;
 }
 
-char* get_var(char* key) {
+char* get_var(const char* key) {
     char* env_result = getenv(key);
     return (env_result != NULL) ? env_result : get_shell_var(key);
 }
@@ -151,22 +151,23 @@ void promptf(char* fmtstr, ...) {
  * Output: {"echo", "hello", "world", NULL}
  */
 void tokenize(const char* oline, char*** ptokens, int* n_tokens) {
-    char* line = clone_str(oline);
+
+    char* const line = clone_str(oline);
     printf("tokenize\n");
     int buff_size = 0;
     int max_buff_size = 1;
     char** tokens = (char**)malloc(buff_size * sizeof(char*));
 
-    printf("right before strtok\n");
+    // printf("right before strtok\n");
     char* token = strtok(line, " ");
-    printf("right after strtok\n");
+    // printf("right after strtok\n");
     while (token != NULL) {
         buff_size++;
         if (buff_size > max_buff_size) {
             max_buff_size *= 2;
             tokens = (char**)realloc(tokens, max_buff_size * sizeof(char*));
         }
-        tokens[buff_size - 1] = clone_str(token);
+        tokens[buff_size - 1] = token;
         token = strtok(NULL, " ");
     }
     tokens = (char**)realloc(tokens, (buff_size + 1) * sizeof(char*));
@@ -224,7 +225,7 @@ void wsh_exit() {
 }
 
 void wsh_export(const char* otoken) {
-    char* token = clone_str(otoken);
+    char* const token = clone_str(otoken);
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));
     setenv(key, val, 1);
@@ -237,7 +238,7 @@ void wsh_history() {
 }
 
 void wsh_local(const char* otoken) {
-    char* token = clone_str(otoken);
+    char* const token = clone_str(otoken);
     printf("wsh_local(%s)\n", token);
     char* key = strtok(token, "=");
     printf("wsh_local key=%s\n", key);
@@ -334,13 +335,10 @@ int main(int argc, char* argv[]) {
             else if (pid == 0) {
                 printf("IN child\n");
                 printf("get_shell_var(aa)=%s\n", get_shell_var("aa"));
-                printf("attempting segfsult\n");
-                char* aa = "local aa=100";
-                char** bb = NULL;
-                int cc = 0;
-                tokenize(aa, &bb, &cc);
-                wsh_local(bb[1]);
+                wsh_local("aa=100");
                 printf("still in child get_shell_var(aa)=%s\n", get_shell_var("aa"));
+                wsh_export("aa=200");
+                printf("still in child get_env(aa)=%s\n", getenv("aa"));
                 printf("getenv(dd)=%s\n", getenv("dd"));
                 printf("Child of wsh, exec into ls\n");
                 char* argv[] = {"ls", "-A", NULL};
@@ -359,6 +357,7 @@ int main(int argc, char* argv[]) {
                 printf("WSTOPSIG=%d\n", WSTOPSIG(status));
                 printf("WIFCONTINUED=%d\n", WIFCONTINUED(status));
                 printf("in parent get_shell_var(aa)=%s\n", get_shell_var("aa"));
+                printf("in parent get_env(aa)=%s\n", getenv("aa"));
             }
         }
 

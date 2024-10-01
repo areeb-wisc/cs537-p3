@@ -22,7 +22,7 @@ char* clone_str(char* str) {
     return(clone);
 }
 
-/******************************* DICTIONATY START *****************************/
+/******************************* DICTIONARY START *****************************/
 
 typedef struct Entry {
     char* key;
@@ -39,7 +39,7 @@ typedef struct Dict {
 dict* shell_vars;
 
 // Return index of key in dictionary if present, else -1 
-int get_idx(char* key) {
+int get_shell_var_idx(char* key) {
     for (int i = 0; i < shell_vars->size; i++) {
         if (strcmp(shell_vars->entries[i]->key, key) == 0)
             return i;
@@ -47,34 +47,38 @@ int get_idx(char* key) {
     return -1;
 }
 
-entry* make_entry(char* key, char* val) {
+entry* make_shell_var_entry(char* key, char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
     new_entry->val = clone_str(val);
     return new_entry;
 }
 
-void add_entry(char* key, char* val) {
-    int idx = get_idx(key);
+void resize_if_needed() {
+    if (shell_vars->size > shell_vars->max_size) {
+        shell_vars->max_size *= 2;
+        shell_vars->entries = (entry**)realloc(shell_vars->entries, shell_vars->max_size * sizeof(entry*));
+    }
+}
+
+void add_shell_var(char* key, char* val) {
+    int idx = get_shell_var_idx(key);
     if (idx == -1) { // add new entry
         shell_vars->size++;
-        if (shell_vars->size > shell_vars->max_size) {
-            shell_vars->max_size *= 2;
-            shell_vars->entries = (entry**)realloc(shell_vars->entries, shell_vars->max_size * sizeof(entry*));
-        }
-        shell_vars->entries[shell_vars->size - 1] = make_entry(key, val);
+        resize_if_needed();
+        shell_vars->entries[shell_vars->size - 1] = make_shell_var_entry(key, val);
     } else // update existing entry
         shell_vars->entries[idx]->val = clone_str(val);
 }
 
-char* get_val(char* key) {
+char* get_shell_var(char* key) {
+    int idx = get_shell_var_idx(key);
+    return (idx != -1) ? shell_vars->entries[idx]->val : NULL;
+}
+
+char* get_var(char* key) {
     char* env_result = getenv(key);
-    if (env_result != NULL) // var present in env variables
-        return env_result;
-    int idx = get_idx(key);
-    if (idx == -1) // var not defined yet
-        return NULL;
-    return shell_vars->entries[idx]->val;
+    return (env_result != NULL) ? env_result : get_shell_var(key);
 }
 
 // TODO(Areeb): remove this later
@@ -88,7 +92,7 @@ void print_shell_vars() {
     printf("}\n");
 }
 
-/********************************** DICTIONATY END *******************************/
+/********************************** DICTIONARY END *******************************/
 
 /******************************* STRING HELPERS START ****************************/
 
@@ -178,7 +182,7 @@ bool is_builtin(char* command) {
 char* dereference(char* varname) {
     if (varname[0] != '$')
         return varname;
-    char* out = get_val(++varname);
+    char* out = get_var(++varname);
     return out ? out : "";
 }
 
@@ -216,7 +220,7 @@ void wsh_local(char* token) {
     char* key = strtok(token, "=");
     char* val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
-    add_entry(key, val);
+    add_shell_var(key, val);
     print_shell_vars();
 }
 

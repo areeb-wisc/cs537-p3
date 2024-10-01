@@ -27,6 +27,8 @@ typedef struct Dict {
 
 } dict;
 
+dict* shell_vars;
+
 // Clone a string
 char* clone_str(char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -35,7 +37,7 @@ char* clone_str(char* str) {
 }
 
 // Return index of key in dictionary if present, else -1 
-int get_idx(dict* shell_vars, char* key) {
+int get_idx(char* key) {
     for (int i = 0; i < shell_vars->size; i++) {
         if (strcmp(shell_vars->entries[i]->key, key) == 0)
             return i;
@@ -50,8 +52,8 @@ entry* make_entry(char* key, char* val) {
     return new_entry;
 }
 
-void add_entry(dict* shell_vars, char* key, char* val) {
-    int idx = get_idx(shell_vars, key);
+void add_entry(char* key, char* val) {
+    int idx = get_idx(key);
     if (idx == -1) { // add new entry
         shell_vars->size++;
         if (shell_vars->size > shell_vars->max_size) {
@@ -63,8 +65,8 @@ void add_entry(dict* shell_vars, char* key, char* val) {
         shell_vars->entries[idx]->val = clone_str(val);
 }
 
-char* get_val(dict* shell_vars, char* key) {
-    int idx = get_idx(shell_vars, key);
+char* get_val(char* key) {
+    int idx = get_idx(key);
     if (idx == -1)
         return NULL;
     return shell_vars->entries[idx]->val;
@@ -149,7 +151,15 @@ void tokenize(char* line, char*** ptokens, int* n_tokens) {
     *n_tokens = buff_size + 1; // size includes NULL
 }
 
-void print_dict(dict* shell_vars) {
+void local(char* token) {
+    char* key = strtok(token, "=");
+    char* val = strtok(NULL, "=");
+    printf("adding key:val as %s:%s\n", key, val);
+    add_entry(key, val);
+    print_shell_vars();
+}
+
+void print_shell_vars() {
     printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
     printf("{");
     for (int i = 0; i < shell_vars->size; i++) {
@@ -159,15 +169,12 @@ void print_dict(dict* shell_vars) {
     printf("}\n");
 }
 
-dict* shell_vars;
-
-void local(char* token) {
-    char* key = strtok(token, "=");
-    char* val = strtok(NULL, "=");
-    add_entry(shell_vars, key, val);
-    print_dict(shell_vars);
+void init_shell_vars() {
+    shell_vars = (dict*)malloc(sizeof(dict));
+    shell_vars->size = 0;
+    shell_vars->max_size = 1;
+    shell_vars->entries = (entry**)malloc(shell_vars->max_size * sizeof(entry*));
 }
-
 
 int main(int argc, char* argv[]) {
 
@@ -184,11 +191,8 @@ int main(int argc, char* argv[]) {
         wsh_prompt = "";
     }
 
-    dict shvars;
-    shell_vars = &shvars;
-    //  = (dict*)malloc(sizeof(dict));
-
-    print_dict(shell_vars);
+    init_shell_vars();
+    print_shell_vars();
 
     char *line = NULL;
     size_t len = 0;

@@ -198,10 +198,11 @@ bool is_builtin(char* command) {
 
 /******************** VARNAME DEREFERENCING HELPERS START *******************/
 
-char* dereference(char* varname) {
+char* dereference(const char* ovarname) {
+    char* const varname = clone_str(ovarname);
     if (varname[0] != '$')
         return varname;
-    char* out = get_var(++varname);
+    char* out = get_var(varname + 1);
     return out ? out : "";
 }
 
@@ -216,44 +217,55 @@ char** dereferences(char** varnames, int n_varnames) {
 
 /*************************** BUILT-IN CALLS START ***************************/
 
-void wsh_cd() {
-
+void wsh_cd(const char* odir) {
+    printf("wsh_cd() called\n");
+    char* const dir = dereference(odir);
+    char* cwd = getcwd(NULL, 0);
+    printf("cwd before cd ../ = %s\n", cwd);
+    printf("running cd %s...\n", dir);
+    int ret = chdir(dir);
+    cwd = getcwd(NULL, 0);
+    printf("ret = %d\n", ret);
+    printf("cwd after cd ../ = %s\n", cwd);
 }
 
 void wsh_exit() {
-
+    printf("wsh_exit() called\n");
+    exit(0);
 }
 
 void wsh_export(const char* otoken) {
+    printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
-    char* key = strtok(token, "=");
-    char* val = dereference(strtok(NULL, "="));
+    char* const key = strtok(token, "=");
+    char* const val = dereference(strtok(NULL, "="));
     setenv(key, val, 1);
     printf("exported getenv(%s)=%s\n", key, getenv(key));
     print_vars();
 }
 
 void wsh_history() {
-
+    printf("wsh_history() called\n");
 }
 
 void wsh_local(const char* otoken) {
+    printf("wsh_local() called\n");
     char* const token = clone_str(otoken);
     printf("wsh_local(%s)\n", token);
-    char* key = strtok(token, "=");
+    char* const key = strtok(token, "=");
     printf("wsh_local key=%s\n", key);
-    char* val = dereference(strtok(NULL, "="));
+    char* const val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
     add_shell_var(key, val);
     print_vars();
 }
 
 void wsh_ls() {
-
+    printf("wsh_ls() called\n");
 }
 
 void wsh_vars() {
-
+    printf("wsh_vars() called\n");
 }
 
 /*************************** BUILT-IN CALLS END ****************************/
@@ -323,9 +335,11 @@ int main(int argc, char* argv[]) {
 
         }
 
-        if (strcmp(command, "local") == 0) {
-            wsh_local(tokens[1]);
-        }
+        if (strcmp(command,"cd") == 0)
+            wsh_cd(tokens[1]);
+
+        if (strcmp(command, "exit") == 0)
+            wsh_exit();
 
         if (strcmp(command, "export") == 0) {
             wsh_export(tokens[1]);
@@ -360,6 +374,18 @@ int main(int argc, char* argv[]) {
                 printf("in parent get_env(aa)=%s\n", getenv("aa"));
             }
         }
+
+        if (strcmp(command, "history") == 0)
+            wsh_history();
+
+        if (strcmp(command, "local") == 0)
+            wsh_local(tokens[1]);
+
+        if (strcmp(command, "ls") == 0)
+            wsh_ls();
+        
+        if (strcmp(command, "vars") == 0)
+            wsh_vars();
 
         // if (strcmp(command, "ls") == 0) {
             // int pid = fork();

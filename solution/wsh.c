@@ -200,6 +200,8 @@ bool is_builtin(const char* command) {
 /******************** VARNAME DEREFERENCING HELPERS START *******************/
 
 char* dereference(const char* ovarname) {
+    if (ovarname == NULL || strcmp(ovarname, "\"\"") == 0)
+        return "";
     char* const varname = clone_str(ovarname);
     if (varname[0] != '$')
         return varname;

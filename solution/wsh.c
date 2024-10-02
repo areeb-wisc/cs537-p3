@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include<ctype.h>
+#include<dirent.h>
 #include<limits.h>
 #include<stdarg.h>
 #include<stdbool.h>
@@ -11,9 +12,9 @@
 #include<unistd.h>
 
 bool interactive = true;
-char* wsh_prompt = "wsh> ";
-int n_builtins = 7;
-char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
+const char* wsh_prompt = "wsh> ";
+const int n_builtins = 7;
+const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 
 // Clone a string
 char* clone_str(const char* str) {
@@ -183,7 +184,7 @@ void tokenize(const char* oline, char*** ptokens, int* n_tokens) {
 /**
  * Return index at which word is present in list, else -1
  */
-int is_word_in_list(char** list, int size, char* word) {
+int is_word_in_list(const char** list, const int size, const char* word) {
     for (int i = 0; i < size; i++) {
         if (strcmp(list[i], word) == 0) // found
             return i;
@@ -191,7 +192,7 @@ int is_word_in_list(char** list, int size, char* word) {
     return -1;
 }
 
-bool is_builtin(char* command) {
+bool is_builtin(const char* command) {
     int idx = is_word_in_list(builtins, n_builtins, command);
     return (idx >=0 && idx < n_builtins);
 }
@@ -260,8 +261,20 @@ void wsh_local(const char* otoken) {
     print_vars();
 }
 
+#ifdef _DIRENT_HAVE_D_TYPE
+bool a = true;
+#endif
+
+int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
+
 void wsh_ls() {
     printf("wsh_ls() called\n");
+    printf("a=%d\n", a);
+    struct dirent** dirs;
+    int n = scandir(".", &dirs, non_hidden_dirent, alphasort);
+    for (int i = 0; i < n; i++)
+        printf("%s, %c\n", dirs[i]->d_name, dirs[i]->d_type);
+    printf("\n");
 }
 
 void wsh_vars() {
@@ -381,34 +394,34 @@ int main(int argc, char* argv[]) {
         if (strcmp(command, "local") == 0)
             wsh_local(tokens[1]);
 
-        if (strcmp(command, "ls") == 0)
-            wsh_ls();
+        // if (strcmp(command, "ls") == 0)
+        //     wsh_ls();
         
         if (strcmp(command, "vars") == 0)
             wsh_vars();
 
-        // if (strcmp(command, "ls") == 0) {
-            // int pid = fork();
-            // if (pid < 0)
-            //     printf("fork failed!!\n");
-            // else if (pid == 0) {
-            //     printf("Child of wsh, exec into ls\n");
-            //     char** argv = tokens;
-            //     execv("/bin/ls", argv);
-            //     printf("exec failed\n");
-            //     exit(EXIT_FAILURE);
-            // } else {
-            //     int status = 0;;
-            //     wait(&status);
-            //     printf("child complete, status=%d!\n", status);
-            //     printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-            // }
-        // }
+        if (strcmp(command, "ls") == 0) {
+            int pid = fork();
+            if (pid < 0)
+                printf("fork failed!!\n");
+            else if (pid == 0) {
+                printf("Child of wsh, exec into ls\n");
+                char** argv = tokens;
+                execv("/bin/ls", argv);
+                printf("exec failed\n");
+                exit(EXIT_FAILURE);
+            } else {
+                int status = 0;;
+                wait(&status);
+                printf("child complete, status=%d!\n", status);
+                printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+            }
+        }
 
         promptf("");
     }
 
-    printf("exiting...\n");
+    printf("\n");
 
     return 0;
 }

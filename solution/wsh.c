@@ -281,6 +281,10 @@ void wsh_ls() {
 
 void wsh_vars() {
     printf("wsh_vars() called\n");
+    for (int i = 0; i < shell_vars->size; i++) {
+        entry* dict_entry = shell_vars->entries[i];
+        printf("%s=%s\n", dict_entry->key, dict_entry->val);
+    }
 }
 
 /*************************** BUILT-IN CALLS END ****************************/

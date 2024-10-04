@@ -57,7 +57,40 @@ void tokenize(char* oline, char*** ptokens, int* p_n_tokens, const char* delim) 
     *p_n_tokens = size + 1;
 }
 
+char* join(const char* str1, const char* str2, const char joiner) {
+    int len1 = strlen(str1), len2 = strlen(str2);
+    char* joined = (char*)malloc((len1 + len2 + 2) * sizeof(char));
+    strcpy(joined, str1);
+    joined[len1] = joiner;
+    joined[len1 + 1] = '\0';
+    strcat(joined, str2);
+    return joined;
+}
+
 int main() {
+
+    printf("%s\n", join("hello", "world", '-'));
+    printf("%s\n", join("hello", "world", ':'));
+    printf("%s\n", join("hello", "world", ' '));
+    printf("%s\n", join("hello", "", '/'));
+    printf("%s\n", join("", "world", '/'));
+    printf("%s\n", join("", "", '/'));
+
+    printf("access(/bin/, F_OK) = %d\n", access("/bin/areeb", F_OK));
+
+    printf("access(/bin/, R_OK) = %d\n", access("/bin/areeb", R_OK));
+
+    printf("access(/bin/, W_OK) = %d\n", access("/bin/areeb", W_OK));
+
+    printf("access(/bin/, X_OK) = %d\n", access("/bin/areeb", X_OK));
+
+    printf("access("", F_OK) = %d\n", access("/", F_OK));
+
+    printf("access("", R_OK) = %d\n", access("/", R_OK));
+
+    printf("access("", W_OK) = %d\n", access("/", W_OK));
+
+    printf("access("", X_OK) = %d\n", access("/", X_OK));
 
     // char* empty = "\"\"";
     // printf("empty=%s\n", empty);
@@ -69,17 +102,17 @@ int main() {
 
     // printf("wsh in dir2\n");
 
-    char* oline = "abc=";
+    // char* oline = "abc=";
     // printf("original line before TOKENIZE = %s\n", oline);
 
-    int n_tokens = 0;
-    char** tokens = NULL;
-    tokenize(oline, &tokens, &n_tokens, "=");
+    // int n_tokens = 0;
+    // char** tokens = NULL;
+    // tokenize(oline, &tokens, &n_tokens, "=");
 
     // printf("MAIN: original line after TOKENIZE = %s\n", oline);
 
     // printf("MAIN: tokens after TOKENIZE\n");
-    print_tokens(tokens, n_tokens);
+    // print_tokens(tokens, n_tokens);
 
     // free(line);
 

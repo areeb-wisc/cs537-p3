@@ -263,19 +263,14 @@ void wsh_local(const char* otoken) {
     print_vars();
 }
 
-#ifdef _DIRENT_HAVE_D_TYPE
-bool a = true;
-#endif
-
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
 
 void wsh_ls() {
     printf("wsh_ls() called\n");
-    printf("a=%d\n", a);
     struct dirent** dirs;
     int n = scandir(".", &dirs, non_hidden_dirent, alphasort);
     for (int i = 0; i < n; i++)
-        printf("%s, %c\n", dirs[i]->d_name, dirs[i]->d_type);
+        printf("%sn", dirs[i]->d_name);
     printf("\n");
 }
 

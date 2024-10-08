@@ -94,7 +94,7 @@ char* get_var(const char* key) {
 
 void print_strings(char** array, int size, char* delim, char* message) {
     printf("%s", message);
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < size + 1; i++) {
         if (array[i] == NULL)
             printf("NULL");
         else
@@ -142,11 +142,9 @@ char* dereference(const char* ovarname) {
     return out ? out : "";
 }
 
-char** dereferences(char** varnames, int n_varnames) {
-    char** out = (char**)malloc(n_varnames * sizeof(char*));
+void dereferences(char*** varnames, int n_varnames) {
     for (int i = 0; i < n_varnames; i++)
-        out[i] = clone_str(dereference(varnames[i]));
-    return out;
+        (*varnames)[i] = dereference((*varnames)[i]);
 }
 
 /********************* VARNAME DEREFERENCING HELPERS END ********************/
@@ -569,8 +567,13 @@ int main(int argc, char* argv[]) {
 
         // Step 4: perform I/O redirection if any
         last_exit_code = handle_redirection_if_any(&tokens, &n_tokens);
+        // perror("standard error message\n");
         printf("n_tokens after redirection: %d\n", n_tokens);
         print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
+
+        // Step 5: expand all variables
+        dereferences(&tokens, n_tokens);
+        print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
 
         if (strcmp(command,"cd") == 0)
             wsh_cd(tokens[1]);
@@ -668,6 +671,7 @@ int main(int argc, char* argv[]) {
                             char** argv = tokens;
                             printf("newpath=%s, len=%ld\n", newpath, strlen(newpath));
                             printf("Child of wsh, exec into %s\n", command);
+                            print_strings(argv, n_tokens, ",", "with argv = ");
                             execv(newpath, argv);
                             printf("exec failed\n");
                             exit(EXIT_FAILURE);
@@ -687,6 +691,10 @@ int main(int argc, char* argv[]) {
         dup2(copy_err, STDERR_FILENO);
 
         promptf("");
+
+        free(line);
+        line = NULL;
+        len = 0;
     }
 
     printf("\n");

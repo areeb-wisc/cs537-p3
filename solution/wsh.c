@@ -678,6 +678,8 @@ int main(int argc, char* argv[]) {
         // Step 3: record history for non built-in commands
         if (!is_builtin(command)) {
             // record history
+            // TODO(Areeb): display is reverse of what it should be
+            // TODO(Areeb): local x=pwd; $x is not working
             push(history, line);
             display(history);
         }

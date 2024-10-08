@@ -20,9 +20,7 @@ typedef struct circular_queue {
     int n, r, f;
 } cqueue;
 
-cqueue* cq;
-
-void init(int size) {
+void init(cqueue* cq, int size) {
     printf("init\n");
     cq->n = size;
     cq->r = -1;
@@ -30,7 +28,7 @@ void init(int size) {
     cq->words = (char**)malloc(size * sizeof(char*));
 }
 
-void push(const char* word) {
+void push(cqueue* cq, const char* word) {
     printf("push %s\n", word);
     if (cq->r == -1 || cq->r == (cq->f + 1) % cq->n)
         cq->r = (cq->r + 1) % cq->n;
@@ -38,7 +36,7 @@ void push(const char* word) {
     cq->words[cq->f] = clone_str(word);
 }
 
-void pop() {
+void pop(cqueue* cq) {
     printf("pop\n");
     if (cq->f == cq->r) {
         cq->f = -1;
@@ -47,7 +45,7 @@ void pop() {
         cq->r = (cq->r + 1) % cq->n;
 }
 
-int getsize() {
+int getsize(cqueue* cq) {
     if (cq->f == -1)
         return 0;
     if (cq->f >= cq->r)
@@ -55,7 +53,7 @@ int getsize() {
     return cq->f + 1 + cq->n - cq->r;
 }
 
-char* get(int no) {
+char* get(cqueue* cq, int no) {
     if (no < 1 || no > cq->n)
         return NULL;
     int i = (cq->f - (no - 1) + cq->n) % cq->n;
@@ -71,68 +69,120 @@ char* get(int no) {
     return NULL;
 }
 
-void print(int no) {
-    char* word = get(no);
+void print(cqueue* cq, int no) {
+    char* word = get(cq, no);
     if (word == NULL)
         printf("NULL\n");
     else
         printf("%s\n", word);
 }
 
-void print_strings(char** array, int size, char* delim, char* message) {
+void print_strings(cqueue* cq, char* delim, char* message) {
     printf("%s", message);
-    int i = cq->r;
+    int i = cq->r, size = getsize(cq);
     while (size--) {
-        printf("%s%s", array[i], delim);
+        printf("%s%s", cq->words[i], delim);
         i = (i + 1) % cq->n;
     }
     printf("\n");
 }
 
-void display() {
+void display(cqueue* cq) {
     printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
-    print_strings(cq->words, getsize(), ",", "words = ");
+    print_strings(cq, ",", "words = ");
+}
+
+void resize(cqueue** cq, int size) {
+
+    printf("resize to %d\n", size);
+    if (size == (*cq)->n)
+        return;
+    
+    if (size < (*cq)->n) {
+        int drop = (*cq)->n - size;
+        while(drop--)
+            pop(*cq);
+    }
+    
+    cqueue* newcq = (cqueue*)malloc(sizeof(cqueue));
+    init(newcq, size);
+
+    int i = (*cq)->r, oldsize = getsize(*cq);
+    while (oldsize--) {
+        push(newcq, (*cq)->words[i]);
+        i = (i + 1) % (*cq)->n;
+    }
+    
+    display(newcq);
+    free(*cq);
+    *cq = newcq;
+
 }
 
 int main() {
 
-    cq = (cqueue*)malloc(sizeof(cqueue));
-    init(1);
-    display();
+    cqueue* history = (cqueue*)malloc(sizeof(cqueue));
+    init(history, 5);
+    display(history);
 
-    push("1");
-    push("2");
-    push("3");
-    push("4");
-    push("5");
-    push("6");
-    pop();
-    pop();
-    display();
-    print(1);
-    print(2);
-    print(3);
-    print(4);
-    print(5);
-    print(6);
+    push(history, "1");
+    push(history, "2");
+    push(history, "3");
+    push(history, "4");
+    push(history, "5");
+    push(history, "6");
+    pop(history);
+    pop(history);
+    display(history);
+    print(history, 1);
+    print(history, 2);
+    print(history, 3);
+    print(history, 4);
+    print(history, 5);
+    print(history, 6);
 
-    push("7");
-    display();
-    print(1);
-    print(2);
-    print(3);
-    print(4);
-    print(5);
-    print(6);
+    push(history, "7");
+    display(history);
+    print(history, 1);
+    print(history, 2);
+    print(history, 3);
+    print(history, 4);
+    print(history, 5);
+    print(history, 6);
 
-    push("8");
-    display();
-    print(1);
-    print(2);
-    print(3);
-    print(4);
-    print(5);
-    print(6);
+    push(history, "8");
+    display(history);
+    print(history, 1);
+    print(history, 2);
+    print(history, 3);
+    print(history, 4);
+    print(history, 5);
+    print(history, 6);
+
+    resize(&history, 3);
+    display(history);
+
+    push(history, "9");
+    display(history);
+    print(history, 1);
+    print(history, 2);
+    print(history, 3);
+    print(history, 4);
+
+    resize(&history, 5);
+    display(history);
+
+    push(history, "10");
+    push(history, "11");
+    push(history, "12");
+    display(history);
+    print(history, 1);
+    print(history, 2);
+    print(history, 3);
+    print(history, 4);
+    print(history, 5);
+    print(history, 6);
+
 
     return 0;
 }

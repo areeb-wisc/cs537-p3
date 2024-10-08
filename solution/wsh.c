@@ -19,6 +19,10 @@ const int n_builtins = 7;
 const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 int last_exit_code = EXIT_CODE_ZERO;
 
+FILE* fd_in = NULL;
+FILE* fd_out = NULL;
+FILE* fd_err = NULL;
+
 // Clone a string
 char* clone_str(const char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -80,7 +84,7 @@ int add_shell_var(const char* key, const char* val) {
 
 char* get_shell_var(const char* key) {
     int idx = get_shell_var_idx(key);
-    return (idx != -1) ? shell_vars->entries[idx]->val : NULL;
+    return (idx != -1) ? clone_str(shell_vars->entries[idx]->val) : NULL;
 }
 
 char* get_var(const char* key) {
@@ -206,7 +210,7 @@ void tokenize(const char* oline, const char* delim, char*** ptokens, int* n_toke
             max_buff_size *= 2;
             tokens = (char**)realloc(tokens, max_buff_size * sizeof(char*));
         }
-        tokens[buff_size - 1] = dereference(token);
+        tokens[buff_size - 1] = token;
         token = strtok(NULL, delim);
     }
     tokens = (char**)realloc(tokens, (buff_size + 1) * sizeof(char*));
@@ -232,6 +236,143 @@ char* join(const char* str1, const char* str2, const char joiner) {
     joined[len1 + 1] = '\0';
     strcat(joined, str2);
     return joined;
+}
+
+void try_delim(const char* otoken, const char* delim) {
+    char* token = clone_str(otoken);
+    char** tokens = NULL;
+    int n_tokens = 0;
+    tokenize(token, delim, &tokens, &n_tokens);
+    char* joined = join(join("delimiting on", delim, ' '),"gives: ", ' ');
+    print_strings(tokens, n_tokens, ",", joined);
+}
+
+int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
+    printf("opening %s\n", file_name);
+    FILE* file = fopen(file_name, mode);
+    printf("opened %s in %s mode\n", file_name, mode);
+    if (file == NULL)
+        return -1;
+    int fno = fileno(file);
+    printf("valid fileno: %d\n", fno);
+    if (dup2(fileno(file), fd) < 0)
+        return -1;
+    printf("dup2 success\n");
+    if (close(fileno(file)) < 0)
+        return -1;
+    printf("close() success\n");
+    return 0;
+}
+
+int handle_redirection_if_any(char*** tokens, int* n_tokens) {
+    
+    char* last_token = clone_str((*tokens)[*n_tokens - 1]);
+
+    printf("---------------------------------------------------\n");
+    printf("last_token: %s\n", last_token);
+
+    bool redirection = false;
+
+    int fd = -1;
+    char* file_name = NULL;
+    char* mode = NULL;
+    char *found1 = NULL, *found2 = NULL, *found3 = NULL;
+
+    // Check for &> and &>>
+    found1 = strstr(last_token, "&>");
+    // Check for > and >>
+    found2 = strstr(last_token, ">");
+    // Check for <
+    found3 = strstr(last_token, "<");
+
+
+    if (found1 != NULL) { // found &> (could be &>> also)
+        redirection = true;
+        if (found1 != last_token) // [n]&> is invalid
+            return -1;
+        if (strlen(found1) == 2)
+            return -1; // &> without word is invalid
+        if (*(found1 + 2) == '>') { // &>> found
+            if (strlen(found1) == 3) // &>> without word is invalid
+                return -1;
+            file_name = dereference(found1 + 3);
+            mode = "a";
+        } else {
+            file_name = dereference(found1 + 2);
+            mode = "w";
+        }
+        fflush(stdout);
+        if (redirect_fd_to_file(STDOUT_FILENO, file_name, mode) < 0)
+            return -1;
+        fflush(stderr);
+        if (redirect_fd_to_file(STDERR_FILENO, file_name, mode) < 0)
+            return -1;
+    }
+    
+    else if (found2 != NULL) { // found > (could also be >>)
+        printf("found >\n");
+        redirection = true;
+
+        if (strlen(found2) == 1) // [n]>word without word is invalid
+            return -1;
+        
+        if (*(found2 + 1) == '>') { // >> found
+            if (strlen(found2) == 2) // [n]>>word without word is invalid
+                return -1;
+            file_name = dereference(found2 + 2);
+        } else
+            file_name = dereference(found2 + 1);
+
+        
+        if (found2 == last_token) // [n]>word, n = 1 then
+            fd = STDOUT_FILENO;
+        else {
+            int len_fd = found2 - last_token;
+            printf("len_fd = %d\n", len_fd);
+            char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
+            strncpy(fdstr, last_token, len_fd);
+            printf("fdstr = %s\n", fdstr);
+            fd = atoi(fdstr);
+            printf("fd = %d\n", fd);
+        }
+
+        printf("fd = %d, file_name = %s\n", fd, file_name);
+        fflush(stdout);
+        printf("fd = %d, file_name = %s\n", fd, file_name);
+        if (redirect_fd_to_file(fd, file_name, "w") < 0)
+            return -1;
+    }
+
+    else if (found3 != NULL) { // < found
+        redirection = true;
+
+        if (strlen(found3) == 1) // [n]<word without word is invalid
+            return -1;
+        file_name = dereference(found3 + 1);
+        if (found3 == last_token)
+            fd = STDIN_FILENO;
+        else {
+            int len_fd = found3 - last_token;
+            char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
+            strncpy(fdstr, last_token, len_fd);
+            fd = atoi(fdstr);
+        }
+        fflush(stdin);
+        if (redirect_fd_to_file(fd, file_name, "r") < 0)
+            return -1;
+    }
+
+    if (redirection) {
+        printf("redirection attempt successful\n");
+        free((*tokens)[*n_tokens]);
+        printf("free() successful\n");
+        (*tokens)[*n_tokens - 1] = NULL;
+        *n_tokens -= 1;
+        printf("reduction successful\n");
+    }
+
+    printf("---------------------------------------------------\n");
+    return 0;
 }
 
 /**************************** STRING HELPERS END *************************/
@@ -300,7 +441,7 @@ void wsh_export(const char* otoken) {
     char* const val = dereference(strtok(NULL, "="));
     last_exit_code = setenv(key, val, 1);
     printf("exported getenv(%s)=%s\n", key, getenv(key));
-    print_vars();
+    // print_vars();
 }
 
 void wsh_history() {
@@ -316,7 +457,7 @@ void wsh_local(const char* otoken) {
     char* const val = dereference(strtok(NULL, "="));
     printf("adding key:val as %s:%s\n", key, val);
     add_shell_var(key, val);
-    print_vars();
+    // print_vars();
 }
 
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
@@ -359,22 +500,33 @@ void init_shell_vars() {
 
 int main(int argc, char* argv[]) {
 
+    printf("argc = %d\n", argc);
+    print_strings(argv, argc, ", ", "argv=");
+
     if (argc < 1 || argc > 2)
         exit(-1);
 
-    FILE* fd = stdin;
+    fd_in = stdin;
+    fd_out = stdout;
+    fd_err = stderr;
+
+    int copy_in = dup(STDIN_FILENO);
+    int copy_out = dup(STDOUT_FILENO);
+    int copy_err = dup(STDERR_FILENO);
 
     if (argc == 2) {
         interactive = false;
-        fd = fopen(argv[1], "r");
-        if (fd == NULL)
+        fd_in = fopen(argv[1], "r");
+        fd_out = fd_out;
+        fd_err = fd_err;
+        if (fd_in == NULL)
             exit(-1);
         wsh_prompt = "";
     }
 
     init_env_vars();
     init_shell_vars();
-    print_vars();
+    // print_vars();
 
     char *line = NULL;
     size_t len = 0;
@@ -382,9 +534,10 @@ int main(int argc, char* argv[]) {
 
     promptf("");
 
-    while ((read = getline(&line, &len, fd)) != -1) {
+    // Step 1: take user input
+    while ((read = getline(&line, &len, fd_in)) != -1) {
 
-        strip(&line, &read);
+        strip(&line, &read); // strip trailing whitespaces
 
         if (read == 0) { // ignore blank input lines
             promptf("");
@@ -396,18 +549,25 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
+        // Step 2: tokenize without variable expansion
         int n_tokens = 0;
         char** tokens = NULL;
         tokenize(line, " ", &tokens, &n_tokens);
         char* command = tokens[0];
 
         // printf("command: %s\n", command);
-        // printf("n_tokens: %d\n", n_tokens);
+        printf("n_tokens: %d\n", n_tokens);
         print_strings(tokens, n_tokens, ",", "tokens = ");
 
-        if (is_builtin(command)) {
-            // write handle_builtin();
+        // Step 3: record history for non built-in commands
+        if (!is_builtin(command)) {
+            // record history
         }
+
+        // Step 4: perform I/O redirection if any
+        last_exit_code = handle_redirection_if_any(&tokens, &n_tokens);
+        printf("n_tokens after redirection: %d\n", n_tokens);
+        print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
 
         if (strcmp(command,"cd") == 0)
             wsh_cd(tokens[1]);
@@ -518,6 +678,10 @@ int main(int argc, char* argv[]) {
                 }
             }
         }
+
+        dup2(copy_in, STDIN_FILENO);
+        dup2(copy_out, STDOUT_FILENO);
+        dup2(copy_err, STDERR_FILENO);
 
         promptf("");
     }

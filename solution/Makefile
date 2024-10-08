@@ -26,3 +26,6 @@ dict: dict.c
 
 envtest: envtest.c
 	$(CC) $(CFLAGS) $< -o $@
+
+cqueue: cqueue.c
+	$(CC) $(CFLAGS) $< -o $@

@@ -9,6 +9,7 @@
 #include<string.h>
 #include<sys/wait.h>
 #include<unistd.h>
+#include<fcntl.h>
 
 char* clone_str(char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -69,28 +70,147 @@ char* join(const char* str1, const char* str2, const char joiner) {
 
 int main() {
 
-    printf("%s\n", join("hello", "world", '-'));
-    printf("%s\n", join("hello", "world", ':'));
-    printf("%s\n", join("hello", "world", ' '));
-    printf("%s\n", join("hello", "", '/'));
-    printf("%s\n", join("", "world", '/'));
-    printf("%s\n", join("", "", '/'));
+    // char* str1 = "hello world &>> abc";
+    // char* str2 = "&&";
 
-    printf("access(/bin/, F_OK) = %d\n", access("/bin/areeb", F_OK));
+    // if (str2 + 2 == NULL)
+    //     printf("NULL\n");
+    
+    // if (*(str2 + 2) == '\0')
+    //     printf("Yup, also NULL\n");
 
-    printf("access(/bin/, R_OK) = %d\n", access("/bin/areeb", R_OK));
+    // printf("found %s? at %s\n", str2, strstr(str1,str2));
 
-    printf("access(/bin/, W_OK) = %d\n", access("/bin/areeb", W_OK));
+    printf("hello world\n");
+    dup2(STDOUT_FILENO, STDOUT_FILENO);
+    printf("is it working?\n");
 
-    printf("access(/bin/, X_OK) = %d\n", access("/bin/areeb", X_OK));
+    // int copyout = dup(fileno(stdout));
 
-    printf("access("", F_OK) = %d\n", access("/", F_OK));
+    // printf("printing to console\n");
 
-    printf("access("", R_OK) = %d\n", access("/", R_OK));
+    // FILE* fileout = fopen("output.txt", "w");
+    // dup2(fileno(fileout), fileno(stdout));
+    // close(fileno(fileout));
 
-    printf("access("", W_OK) = %d\n", access("/", W_OK));
+    // printf("printing to file!!\n");
 
-    printf("access("", X_OK) = %d\n", access("/", X_OK));
+    // dup2(copyout, fileno(stdout));
+    // close(copyout);
+
+    // printf("printing to console again\n");
+
+
+    // int copyin = dup(fileno(stdin));
+    // printf("stdin = %d\n", fileno(stdin));
+    // printf("copyin = %d\n", copyin);
+
+    // char* line = NULL;
+    // size_t len = 0;
+
+    // int read = getline(&line, &len, stdin);
+    // printf("read %d characters from console = %s\n", read, line);
+
+    // FILE* filein = fopen("input.txt", "r");
+    // printf("filein = %d\n", fileno(filein));
+
+    // int ret = dup2(fileno(filein), fileno(stdin));
+    // printf("dup2(file, stdin) = %d, fileno(stdin) = %d\n", ret, fileno(stdin));
+
+    // // close(fileno(filein));
+
+    // read = getline(&line, &len, stdin);
+    // printf("read %d characters from file = %s\n", read, line);
+
+    // fflush(stdin);
+    // ret = dup2(copyin, fileno(stdin));
+    // printf("dup2(copyin, stdin) = %d, fileno(stdin) = %d\n", ret, fileno(stdin));
+    // // close(copyin);
+
+    // read = getline(&line, &len, stdin);
+    // printf("read %d characters from console = %s\n", read, line);
+
+    // ret = dup2(fileno(filein), fileno(stdin));
+    // printf("dup2(file, stdin) = %d, fileno(stdin) = %d\n", ret, fileno(stdin));
+
+    // read = getline(&line, &len, stdin);
+    // printf("again read %d characters from file = %s\n", read, line);
+
+    // fflush(stdin);
+    // ret = dup2(copyin, fileno(stdin));
+    // printf("dup2(copyin, stdin) = %d, fileno(stdin) = %d\n", ret, fileno(stdin));
+
+    // read = getline(&line, &len, stdin);
+    // printf("again read %d characters from console = %s\n", read, line);
+
+    // close(fileno(filein));
+    // close(copyin);
+
+    // read = getline(&line, &len, stdin);
+    // printf("finally read %d characters from console = %s\n", read, line);
+    
+    // FILE* out = stdout;
+    // int copyout = dup(fileno(out)); // create copy for restoring later
+
+    // FILE* fileout = fopen("output.txt", "w");
+
+    // printf("fileno(console) = %d, fileno(fileout) = %d\n", fileno(stdout), fileno(fileout));
+    
+    // dup2(fileno(fileout), fileno(out));
+
+    // printf("This should be printed to output.txt\n");
+
+    // dup2(copyout, fileno(out));
+    // close(copyout);
+
+    // printf("This should again be printed to console\n");
+
+    // char* line = NULL;
+    // size_t len = 0;
+
+    // FILE* in = stdin;
+    // int copyin = dup(fileno(in));
+    // FILE* filein = fopen("input.txt", "r");
+
+    // int read = getline(&line, &len, stdin);
+    // printf("%d characters read from console = %s\n", read, line);
+
+    // dup2(fileno(filein), fileno(in));
+
+    // read = getline(&line, &len, stdin);
+    // printf("%d characters read from input.txt = %s\n", read, line);
+
+    // read = getline(&line, &len, stdin);
+    // printf("%d characters read from input.txt = %s\n", read, line);
+
+    // dup2(copyin, fileno(in));
+    // close(copyin);
+
+    // read = getline(&line, &len, stdin);
+    // printf("%d characters read from console = %s\n", read, line);
+
+    // printf("%s\n", join("hello", "world", '-'));
+    // printf("%s\n", join("hello", "world", ':'));
+    // printf("%s\n", join("hello", "world", ' '));
+    // printf("%s\n", join("hello", "", '/'));
+    // printf("%s\n", join("", "world", '/'));
+    // printf("%s\n", join("", "", '/'));
+
+    // printf("access(/bin/, F_OK) = %d\n", access("/bin/areeb", F_OK));
+
+    // printf("access(/bin/, R_OK) = %d\n", access("/bin/areeb", R_OK));
+
+    // printf("access(/bin/, W_OK) = %d\n", access("/bin/areeb", W_OK));
+
+    // printf("access(/bin/, X_OK) = %d\n", access("/bin/areeb", X_OK));
+
+    // printf("access("", F_OK) = %d\n", access("/", F_OK));
+
+    // printf("access("", R_OK) = %d\n", access("/", R_OK));
+
+    // printf("access("", W_OK) = %d\n", access("/", W_OK));
+
+    // printf("access("", X_OK) = %d\n", access("/", X_OK));
 
     // char* empty = "\"\"";
     // printf("empty=%s\n", empty);

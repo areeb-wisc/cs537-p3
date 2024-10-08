@@ -320,8 +320,11 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens) {
             if (strlen(found2) == 2) // [n]>>word without word is invalid
                 return -1;
             file_name = dereference(found2 + 2);
-        } else
+            mode = "a";
+        } else {
             file_name = dereference(found2 + 1);
+            mode = "w";
+        }
 
         
         if (found2 == last_token) // [n]>word, n = 1 then
@@ -339,7 +342,7 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens) {
         printf("fd = %d, file_name = %s\n", fd, file_name);
         fflush(stdout);
         printf("fd = %d, file_name = %s\n", fd, file_name);
-        if (redirect_fd_to_file(fd, file_name, "w") < 0)
+        if (redirect_fd_to_file(fd, file_name, mode) < 0)
             return -1;
     }
 

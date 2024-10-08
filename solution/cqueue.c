@@ -65,7 +65,7 @@ char* get(int no) {
     else if (cq->r < cq->f)
         is_valid = (cq->r <= i && i <= cq->f);
     else
-        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i <= cq->n);
+        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
     if (is_valid)
         return clone_str(cq->words[i]);
     return NULL;

@@ -669,7 +669,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        printf("line = %s\n", line);
+        // printf("line = %s\n", line);
 
         // Step 2: tokenize without variable expansion
         int n_tokens = 0;
@@ -687,7 +687,7 @@ int main(int argc, char* argv[]) {
             // TODO(Areeb): display is reverse of what it should be
             // TODO(Areeb): local x=pwd; $x is not working
             push(history, line);
-            display(history);
+            // display(history);
         }
 
         bool redirection = false;

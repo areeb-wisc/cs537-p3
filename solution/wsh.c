@@ -358,6 +358,7 @@ void try_delim(const char* otoken, const char* delim) {
 
 int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
     // printf("opening %s\n", file_name);
+    
     FILE* file = fopen(file_name, mode);
     // printf("opened %s in %s mode\n", file_name, mode);
     if (file == NULL)
@@ -669,7 +670,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        // printf("line = %s\n", line);
+        // promptf("line = %s\n", line);
 
         // Step 2: tokenize without variable expansion
         int n_tokens = 0;

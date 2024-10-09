@@ -5,4 +5,6 @@ echo hello to file1 >file1.txt
 echo env to file2 >file2.txt
 echo $PATH
 ls >>file1.txt
-/bin/ls
+/bin/ls -1a
+pwd >>file1.txt
+pwd >>file1.txt

@@ -1,3 +1,8 @@
 #!./wsh
 
-echo hello
+echo hello to console
+echo hello to file1 >file1.txt
+echo env to file2 >file2.txt
+echo $PATH
+ls >>file1.txt
+/bin/ls

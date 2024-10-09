@@ -28,8 +28,27 @@ void init(cqueue* cq, int size) {
     cq->words = (char**)malloc(size * sizeof(char*));
 }
 
+char* get(cqueue* cq, int no) {
+    if (no < 1 || no > cq->n)
+        return NULL;
+    int i = (cq->f - (no - 1) + cq->n) % cq->n;
+    bool is_valid = false;
+    if (cq->f == cq->r)
+        is_valid = (i == cq->f);
+    else if (cq->r < cq->f)
+        is_valid = (cq->r <= i && i <= cq->f);
+    else
+        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
+    if (is_valid)
+        return clone_str(cq->words[i]);
+    return NULL;
+}
+
 void push(cqueue* cq, const char* word) {
     printf("push %s\n", word);
+    char* front = get(cq, 1);
+    if (front != NULL && strcmp(word, front) == 0)
+        return;
     if (cq->r == -1 || cq->r == (cq->f + 1) % cq->n)
         cq->r = (cq->r + 1) % cq->n;
     cq->f = (cq->f + 1) % cq->n;
@@ -51,22 +70,6 @@ int getsize(cqueue* cq) {
     if (cq->f >= cq->r)
         return cq->f - cq->r + 1;
     return cq->f + 1 + cq->n - cq->r;
-}
-
-char* get(cqueue* cq, int no) {
-    if (no < 1 || no > cq->n)
-        return NULL;
-    int i = (cq->f - (no - 1) + cq->n) % cq->n;
-    bool is_valid = false;
-    if (cq->f == cq->r)
-        is_valid = (i == cq->f);
-    else if (cq->r < cq->f)
-        is_valid = (cq->r <= i && i <= cq->f);
-    else
-        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
-    if (is_valid)
-        return clone_str(cq->words[i]);
-    return NULL;
 }
 
 void print(cqueue* cq, int no) {
@@ -127,12 +130,17 @@ int main() {
 
     push(history, "1");
     push(history, "2");
+    display(history);
+    push(history, "2");
+    display(history);
     push(history, "3");
     push(history, "4");
     push(history, "5");
     push(history, "6");
     pop(history);
     pop(history);
+    display(history);
+    push(history, "6");
     display(history);
     print(history, 1);
     print(history, 2);

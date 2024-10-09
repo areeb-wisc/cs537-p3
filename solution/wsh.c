@@ -447,9 +447,11 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             printf("fd = %d\n", fd);
         }
 
-        printf("fd = %d, file_name = %s\n", fd, file_name);
+        // int flushed = fflush(stdout);
+        // printf("flushed = %d\n", flushed);
+        // printf("fd = %d, file_name = %s\n", fd, file_name);
+        // printf("fd = %d, file_name = %s, mode = %s\n", fd, file_name, mode);
         fflush(stdout);
-        printf("fd = %d, file_name = %s\n", fd, file_name);
         if (redirect_fd_to_file(fd, file_name, mode) < 0)
             return -1;
     }
@@ -583,7 +585,6 @@ int wsh_ls() {
     else {
         for (int i = 0; i < n; i++)
             printf("%s\n", dirs[i]->d_name);
-        printf("\n");
         last_exit_code = EXIT_CODE_ZERO;
     }
     return last_exit_code;
@@ -627,6 +628,9 @@ int main(int argc, char* argv[]) {
     int copy_out = dup(STDOUT_FILENO);
     int copy_err = dup(STDERR_FILENO);
 
+    fflush(stdin);
+    fflush(NULL);
+
     if (argc == 2) {
         interactive = false;
         redirect_fd_to_file(STDIN_FILENO, argv[1], "r");
@@ -652,12 +656,12 @@ int main(int argc, char* argv[]) {
         strip(&line, &read); // strip trailing whitespaces
 
         if (read == 0) { // ignore blank input lines
-            promptf("");
+            // promptf("ignoring empty line\n");
             continue;
         }
 
         if (line[0] == '#') { // ignore comments
-            promptf("");
+            // promptf("ignoring comment\n");
             continue;
         }
 
@@ -804,6 +808,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // flush sreams before next command
+        fflush(stdin);
+        fflush(NULL);
+
+        // reset any redirection
         if (redirection) {
             dup2(copy_in, STDIN_FILENO);
             dup2(copy_out, STDOUT_FILENO);

@@ -147,8 +147,27 @@ void init(cqueue* cq, int size) {
 
 cqueue* history;
 
+char* get(cqueue* cq, int no) {
+    if (no < 1 || no > cq->n)
+        return NULL;
+    int i = (cq->f - (no - 1) + cq->n) % cq->n;
+    bool is_valid = false;
+    if (cq->f == cq->r)
+        is_valid = (i == cq->f);
+    else if (cq->r < cq->f)
+        is_valid = (cq->r <= i && i <= cq->f);
+    else
+        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
+    if (is_valid)
+        return clone_str(cq->words[i]);
+    return NULL;
+}
+
 void push(cqueue* cq, const char* word) {
     printf("push %s\n", word);
+    char* front = get(cq, 1);
+    if (front != NULL && strcmp(word, front) == 0)
+        return;
     if (cq->r == -1 || cq->r == (cq->f + 1) % cq->n)
         cq->r = (cq->r + 1) % cq->n;
     cq->f = (cq->f + 1) % cq->n;
@@ -170,22 +189,6 @@ int getsize(cqueue* cq) {
     if (cq->f >= cq->r)
         return cq->f - cq->r + 1;
     return cq->f + 1 + cq->n - cq->r;
-}
-
-char* get(cqueue* cq, int no) {
-    if (no < 1 || no > cq->n)
-        return NULL;
-    int i = (cq->f - (no - 1) + cq->n) % cq->n;
-    bool is_valid = false;
-    if (cq->f == cq->r)
-        is_valid = (i == cq->f);
-    else if (cq->r < cq->f)
-        is_valid = (cq->r <= i && i <= cq->f);
-    else
-        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
-    if (is_valid)
-        return clone_str(cq->words[i]);
-    return NULL;
 }
 
 void print(cqueue* cq, int no) {
@@ -369,7 +372,7 @@ int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
     return 0;
 }
 
-int handle_redirection_if_any(char*** tokens, int* n_tokens) {
+int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
     
     char* last_token = clone_str((*tokens)[*n_tokens - 1]);
 
@@ -478,7 +481,7 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens) {
         *n_tokens -= 1;
         printf("reduction successful\n");
     }
-
+    *success = redirection;
     printf("---------------------------------------------------\n");
     return 0;
 }
@@ -620,21 +623,14 @@ int main(int argc, char* argv[]) {
     if (argc < 1 || argc > 2)
         exit(-1);
 
-    fd_in = stdin;
-    fd_out = stdout;
-    fd_err = stderr;
-
     int copy_in = dup(STDIN_FILENO);
     int copy_out = dup(STDOUT_FILENO);
     int copy_err = dup(STDERR_FILENO);
 
     if (argc == 2) {
         interactive = false;
-        fd_in = fopen(argv[1], "r");
-        fd_out = fd_out;
-        fd_err = fd_err;
-        if (fd_in == NULL)
-            exit(-1);
+        redirect_fd_to_file(STDIN_FILENO, argv[1], "r");
+        copy_in = dup(STDIN_FILENO);
         wsh_prompt = "";
     }
 
@@ -651,7 +647,7 @@ int main(int argc, char* argv[]) {
     promptf("");
 
     // Step 1: take user input
-    while ((read = getline(&line, &len, fd_in)) != -1) {
+    while ((read = getline(&line, &len, stdin)) != -1) {
 
         strip(&line, &read); // strip trailing whitespaces
 
@@ -664,6 +660,8 @@ int main(int argc, char* argv[]) {
             promptf("");
             continue;
         }
+
+        printf("line = %s\n", line);
 
         // Step 2: tokenize without variable expansion
         int n_tokens = 0;
@@ -684,8 +682,9 @@ int main(int argc, char* argv[]) {
             display(history);
         }
 
+        bool redirection = false;
         // Step 4: perform I/O redirection if any
-        last_exit_code = handle_redirection_if_any(&tokens, &n_tokens);
+        last_exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
         // perror("standard error message\n");
         printf("n_tokens after redirection: %d\n", n_tokens);
         print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
@@ -805,9 +804,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        dup2(copy_in, STDIN_FILENO);
-        dup2(copy_out, STDOUT_FILENO);
-        dup2(copy_err, STDERR_FILENO);
+        if (redirection) {
+            dup2(copy_in, STDIN_FILENO);
+            dup2(copy_out, STDOUT_FILENO);
+            dup2(copy_err, STDERR_FILENO);
+        }
 
         promptf("");
 

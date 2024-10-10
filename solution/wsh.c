@@ -700,6 +700,7 @@ int main(int argc, char* argv[]) {
 
         // Step 5: expand all variables
         dereferences(&tokens, n_tokens);
+        command = tokens[0];
         // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
 
         if (strcmp(command,"cd") == 0)

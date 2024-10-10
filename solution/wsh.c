@@ -13,7 +13,7 @@
 #include<sys/wait.h>
 #include<unistd.h>
 
-// #include "wsh.h"
+#include "wsh.h"
 
 bool interactive = true;
 int initial_history_size = 5;
@@ -35,17 +35,17 @@ char* clone_str(const char* str) {
 
 /******************************* DICTIONARY START *****************************/
 
-typedef struct Entry {
-    char* key;
-    char* val;
-} entry;
+// typedef struct Entry {
+//     char* key;
+//     char* val;
+// } entry;
 
-typedef struct Dict {
-    int size;
-    int max_size;
-    entry** entries;
+// typedef struct Dict {
+//     int size;
+//     int max_size;
+//     entry** entries;
 
-} dict;
+// } dict;
 
 dict* shell_vars;
 
@@ -138,10 +138,10 @@ void print_vars() {
 
 /***************************** HISTORY START **********************************/
 
-typedef struct circular_queue {
-    char** words;
-    int n, r, f;
-} cqueue;
+// typedef struct circular_queue {
+//     char** words;
+//     int n, r, f;
+// } cqueue;
 
 cqueue* create_cqueue(int size) {
     // printf("init\n");
@@ -708,7 +708,7 @@ bool is_builtin(const char* command) {
     return get_dict_idx(builtins, command) != -1;
 }
 
-static int (*wshcalls[])(char**,int) = {wsh_cd,wsh_exit,wsh_export,wsh_history,wsh_local,wsh_ls,wsh_vars};
+// static int (*wshcalls[])(char**,int) = {wsh_cd,wsh_exit,wsh_export,wsh_history,wsh_local,wsh_ls,wsh_vars};
 
 int handle_builtin(char** tokens, int n_tokens) {
     char* command = tokens[0];

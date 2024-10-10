@@ -107,7 +107,7 @@ bool isValidNumber(const char* numstr);
 int wsh_history(char**,int);
 // TODO(Areeb): [local a] should give error
 int wsh_local(char**,int);
-int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
+int non_hidden_dirent(const struct dirent* entry);
 int wsh_ls(char**,int);
 int wsh_vars(char**,int);
 dict* builtins;

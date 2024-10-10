@@ -13,6 +13,8 @@
 #include<sys/wait.h>
 #include<unistd.h>
 
+// #include "wsh.h"
+
 bool interactive = true;
 int initial_history_size = 5;
 const char* wsh_prompt = "wsh> ";

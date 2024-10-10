@@ -21,11 +21,11 @@ $(TARGET)-dbg: $(SRC) $(HEADER)
 clean:
 	rm -f $(TARGET) $(TARGET)-dbg
 
-dict: dict.c
+dict: dict.c dict.h
 	$(CC) $(CFLAGS) $< -o $@
 
-envtest: envtest.c
-	$(CC) $(CFLAGS) $< -o $@
+envtest: envtest.c dict.c dict.h
+	$(CC) $(CFLAGS) $^ -o $@
 
 cqueue: cqueue.c
 	$(CC) $(CFLAGS) $< -o $@

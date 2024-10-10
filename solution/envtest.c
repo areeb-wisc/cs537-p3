@@ -11,11 +11,63 @@
 #include<unistd.h>
 #include<fcntl.h>
 
-char* clone_str(char* str) {
-    char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
-    strcpy(clone, str);
-    return(clone);
+#include "dict.h"
+
+#define WSH_cd      0
+#define WSH_exit    1
+#define WSH_export  2
+#define WSH_history 3
+#define WSH_local   4
+#define WSH_ls      5
+#define WSH_vars    6
+
+const int n_builtins = 7;
+const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
+
+int wsh_cd() {
+    printf("wsh_cd() called\n");
+    return 0;
 }
+int wsh_exit() {
+    printf("wsh_exit() called\n");
+    return 0;
+}
+int wsh_export() {
+    printf("wsh_export() called\n");    
+    return 0;
+}
+int wsh_history() {
+    printf("wsh_history() called\n");    
+    return 0;
+}
+int wsh_local() {
+    printf("wsh_local() called\n");    
+    return 0;
+}
+int wsh_ls() {
+    printf("wsh_ls() called\n");    
+    return 0;
+}
+int wsh_vars() {
+    printf("wsh_vars() called\n");    
+    return 0;
+}
+
+static int (*wshcalls[])(void) = {
+[WSH_cd]      = wsh_cd,
+[WSH_exit]    = wsh_exit,
+[WSH_export]  = wsh_export,
+[WSH_history] = wsh_history,
+[WSH_local]   = wsh_local,
+[WSH_ls]      = wsh_ls,
+[WSH_vars]    = wsh_vars
+};
+
+// char* clone_str(char* str) {
+//     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
+//     strcpy(clone, str);
+//     return(clone);
+// }
 
 void print_tokens(char ** tokens, int n_tokens) {
     // char* abc="abc";
@@ -68,7 +120,37 @@ char* join(const char* str1, const char* str2, const char joiner) {
     return joined;
 }
 
+int handle_builtin(dict* mydicts, char* command) {
+    // char* wsh_command = join("WSH", command, '_');
+    // printf("wsh_command = %s\n", wsh_command);
+    int num = atoi(get_val(mydicts, command));
+    wshcalls[num]();
+    return -1;
+}
+
 int main() {
+
+    dict* mydicts = (dict*)malloc(sizeof(dict));
+    mydicts->size = 0;
+    mydicts->max_size = 1;
+    mydicts->entries = (entry**)malloc(mydicts->max_size * sizeof(entry*));
+
+    for (int i = 0; i < n_builtins; i++) {
+        const char* key = builtins[i];
+        char num = (char)(i + 48);
+        char* val = &num;
+        add_entry(mydicts, key, val);
+    }
+
+    print_dict(mydicts);
+
+    handle_builtin(mydicts, "cd");
+    handle_builtin(mydicts, "exit");
+    handle_builtin(mydicts, "export");
+    handle_builtin(mydicts, "history");
+    handle_builtin(mydicts, "local");
+    handle_builtin(mydicts, "ls");
+    handle_builtin(mydicts, "vars");
 
     // char* str1 = "hello world &>> abc";
     // char* str2 = "&&";
@@ -81,9 +163,9 @@ int main() {
 
     // printf("found %s? at %s\n", str2, strstr(str1,str2));
 
-    printf("hello world\n");
-    dup2(STDOUT_FILENO, STDOUT_FILENO);
-    printf("is it working?\n");
+    // printf("hello world\n");
+    // dup2(STDOUT_FILENO, STDOUT_FILENO);
+    // printf("is it working?\n");
 
     // int copyout = dup(fileno(stdout));
 

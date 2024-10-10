@@ -14,14 +14,11 @@
 #include<unistd.h>
 
 bool interactive = true;
+int initial_history_size = 5;
 const char* wsh_prompt = "wsh> ";
 const int n_builtins = 7;
 const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 int last_exit_code = EXIT_CODE_ZERO;
-
-FILE* fd_in = NULL;
-FILE* fd_out = NULL;
-FILE* fd_err = NULL;
 
 int copy_in;
 int copy_out;
@@ -50,50 +47,53 @@ typedef struct Dict {
 
 dict* shell_vars;
 
+dict* create_dictionary(int maxsize) {
+    dict* dictionary = (dict*)malloc(sizeof(dict));
+    dictionary->size = 0;
+    dictionary->max_size = maxsize;
+    dictionary->entries = (entry**)malloc(dictionary->max_size * sizeof(entry*));
+    return dictionary;
+}
+
 // Return index of key in dictionary if present, else -1 
-int get_shell_var_idx(const char* key) {
-    for (int i = 0; i < shell_vars->size; i++) {
-        if (strcmp(shell_vars->entries[i]->key, key) == 0)
+int get_dict_idx(dict* dictionary, const char* key) {
+    for (int i = 0; i < dictionary->size; i++) {
+        if (strcmp(dictionary->entries[i]->key, key) == 0)
             return i;
     }
     return -1;
 }
 
-entry* make_shell_var_entry(const char* key, const char* val) {
+entry* make_dict_entry(const char* key, const char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
     new_entry->val = clone_str(val);
     return new_entry;
 }
 
-void resize_if_needed() {
-    if (shell_vars->size > shell_vars->max_size) {
-        shell_vars->max_size *= 2;
-        shell_vars->entries = (entry**)realloc(shell_vars->entries, shell_vars->max_size * sizeof(entry*));
+void resize_if_needed(dict* dictionary) {
+    if (dictionary->size > dictionary->max_size) {
+        dictionary->max_size *= 2;
+        dictionary->entries = (entry**)realloc(dictionary->entries, dictionary->max_size * sizeof(entry*));
     }
 }
 
-int add_shell_var(const char* key, const char* val) {
+int add_dict_var(dict* dictionary, const char* key, const char* val) {
     if (key == NULL || strlen(key) == 0 || val == NULL)
         return -1;
-    int idx = get_shell_var_idx(key);
+    int idx = get_dict_idx(dictionary, key);
     if (idx == -1) { // add new entry
-        shell_vars->size++;
-        resize_if_needed();
-        shell_vars->entries[shell_vars->size - 1] = make_shell_var_entry(key, val);
+        dictionary->size++;
+        resize_if_needed(dictionary);
+        dictionary->entries[dictionary->size - 1] = make_dict_entry(key, val);
     } else // update existing entry
-        shell_vars->entries[idx]->val = clone_str(val);
+        dictionary->entries[idx]->val = clone_str(val);
     return 0;
 }
 
-char* get_shell_var(const char* key) {
-    int idx = get_shell_var_idx(key);
-    return (idx != -1) ? clone_str(shell_vars->entries[idx]->val) : NULL;
-}
-
-char* get_var(const char* key) {
-    char* env_result = getenv(key);
-    return (env_result != NULL) ? env_result : get_shell_var(key);
+char* get_dict_var(dict* dictionary, const char* key) {
+    int idx = get_dict_idx(dictionary, key);
+    return (idx != -1) ? clone_str(dictionary->entries[idx]->val) : NULL;
 }
 
 void print_strings(char** array, int size, char* delim, char* message) {
@@ -141,12 +141,14 @@ typedef struct circular_queue {
     int n, r, f;
 } cqueue;
 
-void init(cqueue* cq, int size) {
+cqueue* create_cqueue(int size) {
     // printf("init\n");
+    cqueue* cq = (cqueue*)malloc(sizeof(cqueue));
     cq->n = size;
     cq->r = -1;
     cq->f = -1;
     cq->words = (char**)malloc(size * sizeof(char*));
+    return cq;
 }
 
 cqueue* history;
@@ -232,8 +234,7 @@ void resize(cqueue** cq, int size) {
             pop(*cq);
     }
     
-    cqueue* newcq = (cqueue*)malloc(sizeof(cqueue));
-    init(newcq, size);
+    cqueue* newcq = create_cqueue(size);
 
     int i = (*cq)->r, oldsize = getsize(*cq);
     printf("adding %d items\n", oldsize);
@@ -259,7 +260,10 @@ char* dereference(const char* ovarname) {
     char* const varname = clone_str(ovarname);
     if (varname[0] != '$')
         return varname;
-    char* out = get_var(varname + 1);
+    char* env_result = getenv(varname + 1);
+    if (env_result != NULL) 
+        return env_result;
+    char* out = get_dict_var(shell_vars, varname + 1);
     return out ? out : "";
 }
 
@@ -356,15 +360,6 @@ char* join(const char* str1, const char* str2, const char joiner) {
     joined[len1 + 1] = '\0';
     strcat(joined, str2);
     return joined;
-}
-
-void try_delim(const char* otoken, const char* delim) {
-    char* token = clone_str(otoken);
-    char** tokens = NULL;
-    int n_tokens = 0;
-    tokenize(token, delim, &tokens, &n_tokens);
-    char* joined = join(join("delimiting on", delim, ' '),"gives: ", ' ');
-    print_strings(tokens, n_tokens, ",", joined);
 }
 
 int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
@@ -666,7 +661,7 @@ void wsh_local(const char* otoken) {
     // printf("wsh_local key=%s\n", key);
     char* const val = dereference(strtok(NULL, "="));
     // printf("adding key:val as %s:%s\n", key, val);
-    add_shell_var(key, val);
+    add_dict_var(shell_vars, key, val);
     // print_vars();
 }
 
@@ -755,8 +750,7 @@ int handle(char** tokens, int n_tokens) {
 }
 
 void init_history(int size) {
-    history = (cqueue*)malloc(sizeof(cqueue));
-    init(history, size);
+    history = create_cqueue(size);
 }
 
 void init_env_vars() {
@@ -764,10 +758,7 @@ void init_env_vars() {
 }
 
 void init_shell_vars() {
-    shell_vars = (dict*)malloc(sizeof(dict));
-    shell_vars->size = 0;
-    shell_vars->max_size = 1;
-    shell_vars->entries = (entry**)malloc(shell_vars->max_size * sizeof(entry*));
+    shell_vars = create_dictionary(5);
 }
 
 int main(int argc, char* argv[]) {
@@ -792,7 +783,7 @@ int main(int argc, char* argv[]) {
         wsh_prompt = "";
     }
 
-    init_history(5);
+    init_history(initial_history_size);
     // display(history);
     init_env_vars();
     init_shell_vars();

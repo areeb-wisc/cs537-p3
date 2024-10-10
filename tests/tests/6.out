@@ -1,9 +1,9 @@
 Makefile
 bashtest.sh
+concur.c
 cqueue.c
 dict.c
 envtest.c
-hello.txt
 script.wsh
 wsh
 wsh-dbg

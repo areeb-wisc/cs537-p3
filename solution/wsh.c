@@ -202,9 +202,9 @@ void print(cqueue* cq, int no) {
 void display(cqueue* cq) {
     // printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
     // printf("history->words:\n");
-    int i = cq->f, size = getsize(cq);
-    while (size--) {
-        printf("%d) %s\n", i + 1, cq->words[i]);
+    int i = cq->f, k = 0, size = getsize(cq);
+    while (k < size) {
+        printf("%d) %s\n", ++k, cq->words[i]);
         i = (i - 1 + cq->n) % cq->n;
     }
     // printf("\n");
@@ -212,12 +212,13 @@ void display(cqueue* cq) {
 
 void resize(cqueue** cq, int size) {
 
-    // printf("resize to %d\n", size);
+    printf("resize to %d\n", size);
     if (size == (*cq)->n)
         return;
     
     if (size < (*cq)->n) {
-        int drop = (*cq)->n - size;
+        int drop = getsize(*cq) - size;
+        printf("dropping %d items\n", drop);
         while(drop--)
             pop(*cq);
     }
@@ -226,6 +227,7 @@ void resize(cqueue** cq, int size) {
     init(newcq, size);
 
     int i = (*cq)->r, oldsize = getsize(*cq);
+    printf("adding %d items\n", oldsize);
     while (oldsize--) {
         push(newcq, (*cq)->words[i]);
         i = (i + 1) % (*cq)->n;
@@ -561,9 +563,15 @@ void wsh_export(const char* otoken) {
     // print_vars();
 }
 
-void wsh_history() {
-    // printf("wsh_history() called\n");
+void wsh_history(char** tokens, int n_tokens) {
+    printf("wsh_history() called, n_tokens=%d\n", n_tokens);
     display(history);
+    if (n_tokens == 1)
+        display(history);
+    else if (n_tokens == 3)
+        resize(&history, atoi(tokens[2]));
+    else
+        printf("WIP\n");
 }
 
 void wsh_local(const char* otoken) {
@@ -716,7 +724,7 @@ int main(int argc, char* argv[]) {
             wsh_export(tokens[1]);
 
         if (strcmp(command, "history") == 0)
-            wsh_history();
+            wsh_history(tokens, n_tokens);
 
         if (strcmp(command, "local") == 0)
             wsh_local(tokens[1]);

@@ -184,7 +184,7 @@ int main() {
         add_entry(mydicts, key, val);
     }
 
-    print_dict(mydicts);
+    // print_dict(mydicts);
 
     handle_builtin(mydicts, "cd");
     handle_builtin(mydicts, "exit");

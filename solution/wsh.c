@@ -200,12 +200,12 @@ void print(cqueue* cq, int no) {
 }
 
 void display(cqueue* cq) {
-    printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
-    printf("history->words:\n");
-    int i = cq->r, size = getsize(cq);
+    // printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
+    // printf("history->words:\n");
+    int i = cq->f, size = getsize(cq);
     while (size--) {
-        printf("%s\n", cq->words[i]);
-        i = (i + 1) % cq->n;
+        printf("%d) %s\n", i + 1, cq->words[i]);
+        i = (i - 1 + cq->n) % cq->n;
     }
     printf("\n");
 }
@@ -289,6 +289,7 @@ void promptf(char* fmtstr, ...) {
     char* buff2 = (char*)malloc((out + 1) * sizeof(char));
     vsnprintf(buff2, out + 1, fmtstr, params);
     printf("%s%s", wsh_prompt, buff2);
+    fflush(stdout);
     va_end(params);
     free(buff1);
     free(buff2);
@@ -543,8 +544,9 @@ void wsh_cd(const char* odir) {
 }
 
 void wsh_exit() {
-    printf("wsh_exit() called\n");
-    last_exit_code ? exit(EXIT_CODE_MINUS_ONE) : exit(EXIT_CODE_ZERO);
+    // printf("wsh_exit() called\n");
+    // last_exit_code ? exit(EXIT_CODE_MINUS_ONE) : exit(EXIT_CODE_ZERO);
+    exit(last_exit_code);
 }
 
 void wsh_export(const char* otoken) {
@@ -585,6 +587,7 @@ int wsh_ls() {
     else {
         for (int i = 0; i < n; i++)
             printf("%s\n", dirs[i]->d_name);
+        fflush(stdout);
         last_exit_code = EXIT_CODE_ZERO;
     }
     return last_exit_code;
@@ -656,12 +659,12 @@ int main(int argc, char* argv[]) {
         strip(&line, &read); // strip trailing whitespaces
 
         if (read == 0) { // ignore blank input lines
-            // promptf("ignoring empty line\n");
+            promptf("");
             continue;
         }
 
         if (line[0] == '#') { // ignore comments
-            // promptf("ignoring comment\n");
+            promptf("");
             continue;
         }
 
@@ -784,6 +787,8 @@ int main(int argc, char* argv[]) {
                 for (int i = 0; i < n_paths; i++) {
                     char* newpath = join(paths[i], command, '/');
                     last_exit_code = access(newpath, X_OK);
+                    // printf("last_exit_code = %d\n", last_exit_code);
+                    // fflush(stdout);
                     int can_execute = (last_exit_code == 0);
                     if (can_execute) {
                         int pid = fork();
@@ -800,8 +805,9 @@ int main(int argc, char* argv[]) {
                         } else {
                             int status = 0;;
                             wait(&status);
-                            printf("child complete, status=%d!\n", status);
-                            printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+                            break;
+                            // printf("child complete, status=%d!\n", status);
+                            // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
                         }
                     }
                 }
@@ -826,7 +832,7 @@ int main(int argc, char* argv[]) {
         len = 0;
     }
 
-    printf("\n");
-
+    wsh_exit();
+    // printf("\n");
     return 0;
 }

@@ -26,6 +26,9 @@ int copy_in;
 int copy_out;
 int copy_err;
 
+dict* shell_vars;
+cqueue* history;
+
 // Clone a string
 char* clone_str(const char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -57,15 +60,6 @@ dict* create_dictionary(int maxsize) {
     return dictionary;
 }
 
-// Return index of key in dictionary if present, else -1 
-int get_dict_idx(dict* dictionary, const char* key) {
-    for (int i = 0; i < dictionary->size; i++) {
-        if (strcmp(dictionary->entries[i]->key, key) == 0)
-            return i;
-    }
-    return -1;
-}
-
 entry* make_dict_entry(const char* key, const char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
@@ -78,6 +72,15 @@ void resize_if_needed(dict* dictionary) {
         dictionary->max_size *= 2;
         dictionary->entries = (entry**)realloc(dictionary->entries, dictionary->max_size * sizeof(entry*));
     }
+}
+
+// Return index of key in dictionary if present, else -1 
+int get_dict_idx(dict* dictionary, const char* key) {
+    for (int i = 0; i < dictionary->size; i++) {
+        if (strcmp(dictionary->entries[i]->key, key) == 0)
+            return i;
+    }
+    return -1;
 }
 
 int add_dict_var(dict* dictionary, const char* key, const char* val) {

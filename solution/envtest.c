@@ -81,33 +81,32 @@ void print_tokens(char ** tokens, int n_tokens) {
     printf("}\n");
 }
 
-void tokenize(char* oline, char*** ptokens, int* p_n_tokens, const char* delim) {
+void tokenize(const char* oline, const char* delim, char*** ptokens, int* n_tokens) {
 
-    char* line = clone_str(oline);
-    // printf("TOKENIZE: copied line before strtok = %s\n", line);
-    
-    char** tokens = (char**)malloc(20*sizeof(char*));
-    int size = -1;
+    char* const line = clone_str(oline);
+    // printf("tokenize\n");
+    int buff_size = 0;
+    int max_buff_size = 1;
+    char** tokens = (char**)malloc(buff_size * sizeof(char*));
+
+    // printf("right before strtok\n");
     char* token = strtok(line, delim);
+    // printf("right after strtok\n");
     while (token != NULL) {
-        tokens[++size] = clone_str(token);
-        token = strtok(NULL, delim);        
+        buff_size++;
+        if (buff_size > max_buff_size) {
+            max_buff_size *= 2;
+            tokens = (char**)realloc(tokens, max_buff_size * sizeof(char*));
+        }
+        tokens[buff_size - 1] = token;
+        token = strtok(NULL, delim);
     }
+    tokens = (char**)realloc(tokens, (buff_size + 1) * sizeof(char*));
+    tokens[buff_size] = NULL;
 
-    // printf("TOKENIZE: copied line after strtok = %s\n", line);
-    
-    // printf("TOKENIZE: tokens before free\n");
-    // print_tokens(tokens, size + 1);
-
-    free(line);
-
-    // printf("TOKENIZE: copied line after free = %s\n", line);
-    
-    // printf("TOKENIZE: tokens after free\n");
-    // print_tokens(tokens, size + 1);
-
-    *ptokens = tokens;
-    *p_n_tokens = size + 1;
+    *ptokens = tokens; // list of all token strings (including NULL)
+    *n_tokens = buff_size; // size does not include NULL
+    // printf("tokenize complete\n");
 }
 
 char* join(const char* str1, const char* str2, const char joiner) {
@@ -126,6 +125,49 @@ int handle_builtin(dict* mydicts, char* command) {
     int num = atoi(get_val(mydicts, command));
     wshcalls[num]();
     return -1;
+}
+
+char* get_filename_from_path1(const char* path) {
+    
+    if (path == NULL)
+        return NULL;
+    
+    int pathlen = strlen(path);
+    int i = pathlen - 1;
+    while (i >= 0 && path[i] != '/')
+        i--;
+    
+    int n = pathlen - i - 1;
+    char* filename = (char*)malloc((n + 1) * sizeof(char));
+    return strncpy(filename, path + i + 1, n);
+}
+
+char* get_filename_from_path2(const char* path) {
+    
+    if (path == NULL)
+        return NULL;
+    
+    int len = strlen(path);
+    if (len == 0 || path[len - 1] == '/')
+        return "";
+
+    char** tokens = NULL;
+    int n_tokens = 0;
+    tokenize(path,"/",&tokens,&n_tokens);
+
+    // print_tokens(tokens, n_tokens);
+    if (n_tokens == 0)
+        return "";
+
+    return tokens[n_tokens - 1];
+}
+
+bool areEqual(const char* str1, const char* str2) {
+    if (str1 == NULL && str2 == NULL)
+        return true;
+    if (str1 == NULL || str2 == NULL)
+        return false;
+    return strcmp(str1,str2) == 0;
 }
 
 int main() {
@@ -151,6 +193,18 @@ int main() {
     handle_builtin(mydicts, "local");
     handle_builtin(mydicts, "ls");
     handle_builtin(mydicts, "vars");
+
+    // int n_paths = 8;
+    // char* paths[] = {""," ","path","/","/path","/path/","/path/file","/path/file/"};
+
+    // for (int i = 0; i < n_paths; i++) {
+    //     char* out1 = get_filename_from_path1(paths[i]);
+    //     if (!out1) out1 = "NULL";
+    //     char* out2 = get_filename_from_path2(paths[i]);
+    //     if (!out2) out2 = "NULL";
+    //     printf("paths = %s\n",paths[i]);
+    //     printf("out1 = %s, out2 = %s, equal = %d\n\n", out1, out2, areEqual(out1,out2));
+    // }
 
     // char* str1 = "hello world &>> abc";
     // char* str2 = "&&";

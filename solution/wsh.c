@@ -138,7 +138,7 @@ typedef struct circular_queue {
 } cqueue;
 
 void init(cqueue* cq, int size) {
-    printf("init\n");
+    // printf("init\n");
     cq->n = size;
     cq->r = -1;
     cq->f = -1;
@@ -164,7 +164,7 @@ char* get(cqueue* cq, int no) {
 }
 
 void push(cqueue* cq, const char* word) {
-    printf("push %s\n", word);
+    // printf("push %s\n", word);
     char* front = get(cq, 1);
     if (front != NULL && strcmp(word, front) == 0)
         return;
@@ -175,7 +175,7 @@ void push(cqueue* cq, const char* word) {
 }
 
 void pop(cqueue* cq) {
-    printf("pop\n");
+    // printf("pop\n");
     if (cq->f == cq->r) {
         cq->f = -1;
         cq->r = -1;
@@ -207,12 +207,12 @@ void display(cqueue* cq) {
         printf("%d) %s\n", i + 1, cq->words[i]);
         i = (i - 1 + cq->n) % cq->n;
     }
-    printf("\n");
+    // printf("\n");
 }
 
 void resize(cqueue** cq, int size) {
 
-    printf("resize to %d\n", size);
+    // printf("resize to %d\n", size);
     if (size == (*cq)->n)
         return;
     
@@ -357,19 +357,20 @@ void try_delim(const char* otoken, const char* delim) {
 }
 
 int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
-    printf("opening %s\n", file_name);
+    // printf("opening %s\n", file_name);
+    
     FILE* file = fopen(file_name, mode);
-    printf("opened %s in %s mode\n", file_name, mode);
+    // printf("opened %s in %s mode\n", file_name, mode);
     if (file == NULL)
         return -1;
-    int fno = fileno(file);
-    printf("valid fileno: %d\n", fno);
+    // int fno = fileno(file);
+    // printf("valid fileno: %d\n", fno);
     if (dup2(fileno(file), fd) < 0)
         return -1;
-    printf("dup2 success\n");
+    // printf("dup2 success\n");
     if (close(fileno(file)) < 0)
         return -1;
-    printf("close() success\n");
+    // printf("close() success\n");
     return 0;
 }
 
@@ -377,8 +378,8 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
     
     char* last_token = clone_str((*tokens)[*n_tokens - 1]);
 
-    printf("---------------------------------------------------\n");
-    printf("last_token: %s\n", last_token);
+    // printf("---------------------------------------------------\n");
+    // printf("last_token: %s\n", last_token);
 
     bool redirection = false;
 
@@ -419,13 +420,14 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
     }
     
     else if (found2 != NULL) { // found > (could also be >>)
-        printf("found >\n");
+        // printf("found >\n");
         redirection = true;
 
         if (strlen(found2) == 1) // [n]>word without word is invalid
             return -1;
         
         if (*(found2 + 1) == '>') { // >> found
+            // printf("found >>\n");
             if (strlen(found2) == 2) // [n]>>word without word is invalid
                 return -1;
             file_name = dereference(found2 + 2);
@@ -440,12 +442,12 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             fd = STDOUT_FILENO;
         else {
             int len_fd = found2 - last_token;
-            printf("len_fd = %d\n", len_fd);
+            // printf("len_fd = %d\n", len_fd);
             char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
             strncpy(fdstr, last_token, len_fd);
-            printf("fdstr = %s\n", fdstr);
+            // printf("fdstr = %s\n", fdstr);
             fd = atoi(fdstr);
-            printf("fd = %d\n", fd);
+            // printf("fd = %d\n", fd);
         }
 
         // int flushed = fflush(stdout);
@@ -477,15 +479,15 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
     }
 
     if (redirection) {
-        printf("redirection attempt successful\n");
+        // printf("redirection attempt successful\n");
         free((*tokens)[*n_tokens]);
-        printf("free() successful\n");
+        // printf("free() successful\n");
         (*tokens)[*n_tokens - 1] = NULL;
         *n_tokens -= 1;
-        printf("reduction successful\n");
+        // printf("reduction successful\n");
     }
     *success = redirection;
-    printf("---------------------------------------------------\n");
+    // printf("---------------------------------------------------\n");
     return 0;
 }
 
@@ -532,15 +534,15 @@ char* get_filename_from_path(const char* path) {
 /*************************** BUILT-IN CALLS START ***************************/
 
 void wsh_cd(const char* odir) {
-    printf("wsh_cd() called\n");
+    // printf("wsh_cd() called\n");
     char* const dir = dereference(odir);
-    char* cwd = getcwd(NULL, 0);
-    printf("cwd before cd ../ = %s\n", cwd);
-    printf("running cd %s...\n", dir);
+    // char* cwd = getcwd(NULL, 0);
+    // printf("cwd before cd ../ = %s\n", cwd);
+    // printf("running cd %s...\n", dir);
     last_exit_code = chdir(dir);
-    cwd = getcwd(NULL, 0);
-    printf("last_exit_code = %d\n", last_exit_code);
-    printf("cwd after cd ../ = %s\n", cwd);
+    // cwd = getcwd(NULL, 0);
+    // printf("last_exit_code = %d\n", last_exit_code);
+    // printf("cwd after cd ../ = %s\n", cwd);
 }
 
 void wsh_exit() {
@@ -550,28 +552,28 @@ void wsh_exit() {
 }
 
 void wsh_export(const char* otoken) {
-    printf("wsh_export() called\n");
+    // printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
     char* const key = strtok(token, "=");
     char* const val = dereference(strtok(NULL, "="));
     last_exit_code = setenv(key, val, 1);
-    printf("exported getenv(%s)=%s\n", key, getenv(key));
+    // printf("exported getenv(%s)=%s\n", key, getenv(key));
     // print_vars();
 }
 
 void wsh_history() {
-    printf("wsh_history() called\n");
+    // printf("wsh_history() called\n");
     display(history);
 }
 
 void wsh_local(const char* otoken) {
-    printf("wsh_local() called\n");
+    // printf("wsh_local() called\n");
     char* const token = clone_str(otoken);
-    printf("wsh_local(%s)\n", token);
+    // printf("wsh_local(%s)\n", token);
     char* const key = strtok(token, "=");
-    printf("wsh_local key=%s\n", key);
+    // printf("wsh_local key=%s\n", key);
     char* const val = dereference(strtok(NULL, "="));
-    printf("adding key:val as %s:%s\n", key, val);
+    // printf("adding key:val as %s:%s\n", key, val);
     add_shell_var(key, val);
     // print_vars();
 }
@@ -579,7 +581,7 @@ void wsh_local(const char* otoken) {
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
 
 int wsh_ls() {
-    printf("wsh_ls() called\n");
+    // printf("wsh_ls() called\n");
     struct dirent** dirs;
     int n = scandir(".", &dirs, non_hidden_dirent, alphasort);
     if (n == -1)
@@ -594,7 +596,7 @@ int wsh_ls() {
 }
 
 void wsh_vars() {
-    printf("wsh_vars() called\n");
+    // printf("wsh_vars() called\n");
     for (int i = 0; i < shell_vars->size; i++) {
         entry* dict_entry = shell_vars->entries[i];
         printf("%s=%s\n", dict_entry->key, dict_entry->val);
@@ -621,8 +623,8 @@ void init_shell_vars() {
 
 int main(int argc, char* argv[]) {
 
-    printf("argc = %d\n", argc);
-    print_strings(argv, argc, ", ", "argv=");
+    // printf("argc = %d\n", argc);
+    // print_strings(argv, argc, ", ", "argv=");
 
     if (argc < 1 || argc > 2)
         exit(-1);
@@ -642,7 +644,7 @@ int main(int argc, char* argv[]) {
     }
 
     init_history(5);
-    display(history);
+    // display(history);
     init_env_vars();
     init_shell_vars();
     // print_vars();
@@ -668,7 +670,7 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        printf("line = %s\n", line);
+        // promptf("line = %s\n", line);
 
         // Step 2: tokenize without variable expansion
         int n_tokens = 0;
@@ -677,8 +679,8 @@ int main(int argc, char* argv[]) {
         char* command = tokens[0];
 
         // printf("command: %s\n", command);
-        printf("n_tokens: %d\n", n_tokens);
-        print_strings(tokens, n_tokens, ",", "tokens = ");
+        // printf("n_tokens: %d\n", n_tokens);
+        // print_strings(tokens, n_tokens, ",", "tokens = ");
 
         // Step 3: record history for non built-in commands
         if (!is_builtin(command)) {
@@ -686,59 +688,31 @@ int main(int argc, char* argv[]) {
             // TODO(Areeb): display is reverse of what it should be
             // TODO(Areeb): local x=pwd; $x is not working
             push(history, line);
-            display(history);
+            // display(history);
         }
 
         bool redirection = false;
         // Step 4: perform I/O redirection if any
         last_exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
         // perror("standard error message\n");
-        printf("n_tokens after redirection: %d\n", n_tokens);
-        print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
+        // printf("n_tokens after redirection: %d\n", n_tokens);
+        // print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
 
         // Step 5: expand all variables
         dereferences(&tokens, n_tokens);
-        print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
+        // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
 
         if (strcmp(command,"cd") == 0)
             wsh_cd(tokens[1]);
 
+        // if (strcmp(command,"env") == 0)
+        //     print_environ();
+
         if (strcmp(command, "exit") == 0)
             wsh_exit();
 
-        if (strcmp(command, "export") == 0) {
+        if (strcmp(command, "export") == 0)
             wsh_export(tokens[1]);
-            // int pid = fork();
-            // if (pid < 0)
-            //     printf("fork failed!!\n");
-            // else if (pid == 0) {
-            //     printf("IN child\n");
-            //     printf("get_shell_var(aa)=%s\n", get_shell_var("aa"));
-            //     wsh_local("aa=100");
-            //     printf("still in child get_shell_var(aa)=%s\n", get_shell_var("aa"));
-            //     wsh_export("aa=200");
-            //     printf("still in child get_env(aa)=%s\n", getenv("aa"));
-            //     printf("getenv(dd)=%s\n", getenv("dd"));
-            //     printf("Child of wsh, exec into ls\n");
-            //     char* argv[] = {"ls", "-A", NULL};
-            //     execv("/bin/ls", argv);
-            //     printf("exec failed\n");
-            //     exit(EXIT_FAILURE);
-            // } else {
-            //     int status = 0;;
-            //     wait(&status);
-            //     printf("child complete, status=%d!\n", status);
-            //     printf("WIFEXITED=%d\n", WIFEXITED(status));
-            //     printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-            //     printf("WIFSIGNALED=%d\n", WIFSIGNALED(status));
-            //     printf("WTERMSIG=%d\n", WTERMSIG(status));
-            //     printf("WIFSTOPPED=%d\n", WIFSTOPPED(status));
-            //     printf("WSTOPSIG=%d\n", WSTOPSIG(status));
-            //     printf("WIFCONTINUED=%d\n", WIFCONTINUED(status));
-            //     printf("in parent get_shell_var(aa)=%s\n", get_shell_var("aa"));
-            //     printf("in parent get_env(aa)=%s\n", getenv("aa"));
-            // }
-        }
 
         if (strcmp(command, "history") == 0)
             wsh_history();
@@ -753,37 +727,37 @@ int main(int argc, char* argv[]) {
             wsh_vars();
 
         if (!is_builtin(command)) {
-            printf("non built-in command, exec to execute\n");
+            // printf("non built-in command, exec to execute\n");
             last_exit_code = access(command, X_OK);
             int can_execute = (last_exit_code == 0);
             if (can_execute) {
-                printf("can_execute = 0\n");
+                // printf("can_execute = 0\n");
                 int pid = fork();
                 if (pid < 0)
                     printf("fork failed!!\n");
                 else if (pid == 0) {
                     char** argv = tokens;
                     char* executable = get_filename_from_path(command);
-                    printf("filename=%s, len=%ld\n", executable, strlen(executable));
+                    // printf("filename=%s, len=%ld\n", executable, strlen(executable));
                     argv[0] = clone_str(executable);
-                    printf("Child of wsh, exec into %s\n", executable);
+                    // printf("Child of wsh, exec into %s\n", executable);
                     execv(command, argv);
-                    printf("exec failed\n");
+                    // printf("exec failed\n");
                     exit(EXIT_FAILURE);
                 } else {
                     int status = 0;;
                     wait(&status);
-                    printf("child complete, status=%d!\n", status);
-                    printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
+                    // printf("child complete, status=%d!\n", status);
+                    // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
                 }
             } else {
-                printf("can not execute, try searching $PATH!!\n");
+                // printf("can not execute, try searching $PATH!!\n");
                 char* path = getenv("PATH");
-                printf("PATH=%s\n", path);
+                // printf("PATH=%s\n", path);
                 char** paths = NULL;
                 int n_paths = 0;
                 tokenize(path, ":", &paths, &n_paths);
-                print_strings(paths, n_paths, "\n", "PATH:\n");
+                // print_strings(paths, n_paths, "\n", "PATH:\n");
                 for (int i = 0; i < n_paths; i++) {
                     char* newpath = join(paths[i], command, '/');
                     last_exit_code = access(newpath, X_OK);
@@ -796,11 +770,11 @@ int main(int argc, char* argv[]) {
                             printf("fork failed!!\n");
                         else if (pid == 0) {
                             char** argv = tokens;
-                            printf("newpath=%s, len=%ld\n", newpath, strlen(newpath));
-                            printf("Child of wsh, exec into %s\n", command);
-                            print_strings(argv, n_tokens, ",", "with argv = ");
+                            // printf("newpath=%s, len=%ld\n", newpath, strlen(newpath));
+                            // printf("Child of wsh, exec into %s\n", command);
+                            // print_strings(argv, n_tokens, ",", "with argv = ");
                             execv(newpath, argv);
-                            printf("exec failed\n");
+                            // printf("exec failed\n");
                             exit(EXIT_FAILURE);
                         } else {
                             int status = 0;;

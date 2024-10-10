@@ -16,8 +16,8 @@
 bool interactive = true;
 int initial_history_size = 5;
 const char* wsh_prompt = "wsh> ";
-const int n_builtins = 7;
-const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
+// const int n_builtins = 7;
+// const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 int last_exit_code = EXIT_CODE_ZERO;
 
 int copy_in;
@@ -117,11 +117,11 @@ void print_environ() {
 }
 
 
-void print_shell_vars() {
-    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
+void print_dict(dict* dictionary) {
+    printf("size=%d, max_size=%d, dict=", dictionary->size, dictionary->max_size);
     printf("{");
-    for (int i = 0; i < shell_vars->size; i++) {
-        entry* dict_entry = shell_vars->entries[i];
+    for (int i = 0; i < dictionary->size; i++) {
+        entry* dict_entry = dictionary->entries[i];
         printf("%s:%s,", dict_entry->key, dict_entry->val);
     }
     printf("}\n");
@@ -129,7 +129,7 @@ void print_shell_vars() {
 
 void print_vars() {
     print_environ();
-    print_shell_vars();
+    print_dict(shell_vars);
 }
 
 /********************************** DICTIONARY END *******************************/
@@ -500,22 +500,6 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
 /**************************** STRING HELPERS END *************************/
 
 /**
- * Return index at which word is present in list, else -1
- */
-int is_word_in_list(const char** list, const int size, const char* word) {
-    for (int i = 0; i < size; i++) {
-        if (strcmp(list[i], word) == 0) // found
-            return i;
-    }
-    return -1;
-}
-
-bool is_builtin(const char* command) {
-    int idx = is_word_in_list(builtins, n_builtins, command);
-    return (idx >=0 && idx < n_builtins);
-}
-
-/**
  * Get file name from its path
  * e.g. path/to/file1.txt -> file1.txt
  * e.g. /file2.txt -> file2.txt
@@ -582,31 +566,46 @@ int handle_non_builtin(char** tokens, int n_tokens) {
 
 /***************************** BUILT-IN CALLS START ***************************/
 
-void wsh_cd(const char* odir) {
+int wsh_cd(char** tokens, int n_tokens) {
+    if (n_tokens < 1 || n_tokens > 2)
+        return -1;
     // printf("wsh_cd() called\n");
+    char* odir = tokens[1];
     char* const dir = dereference(odir);
     // char* cwd = getcwd(NULL, 0);
     // printf("cwd before cd ../ = %s\n", cwd);
     // printf("running cd %s...\n", dir);
-    last_exit_code = chdir(dir);
+    if (chdir(dir) < 0)
+        return -1;
+    return 0;
     // cwd = getcwd(NULL, 0);
     // printf("last_exit_code = %d\n", last_exit_code);
     // printf("cwd after cd ../ = %s\n", cwd);
 }
 
-void wsh_exit() {
+int wsh_exit(char** tokens, int n_tokens) {
+    if (n_tokens != 1)
+        return -1;
     // printf("wsh_exit() called\n");
     // last_exit_code ? exit(EXIT_CODE_MINUS_ONE) : exit(EXIT_CODE_ZERO);
     // printf("last_exit_code from wsh_exit() = %d\n", last_exit_code);
+    tokens = tokens;
     exit(last_exit_code);
+    return 0;
 }
 
-void wsh_export(const char* otoken) {
+// TODO(Areeb): [export a] should give error 
+int wsh_export(char** tokens, int n_tokens) {
+    if (n_tokens != 2)
+        return -1;
+    const char* otoken = tokens[1];
     // printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
     char* const key = strtok(token, "=");
     char* const val = dereference(strtok(NULL, "="));
-    last_exit_code = setenv(key, val, 1);
+    if(setenv(key, val, 1) < 0)
+        return -1;
+    return 0;
     // printf("exported getenv(%s)=%s\n", key, getenv(key));
     // print_vars();
 }
@@ -653,7 +652,11 @@ int wsh_history(char** tokens, int n_tokens) {
     return 0;
 }
 
-void wsh_local(const char* otoken) {
+// TODO(Areeb): [local a] should give error
+int wsh_local(char** tokens, int n_tokens) {
+    if (n_tokens != 2)
+        return -1;
+    const char* otoken = tokens[1];
     // printf("wsh_local() called\n");
     char* const token = clone_str(otoken);
     // printf("wsh_local(%s)\n", token);
@@ -661,35 +664,56 @@ void wsh_local(const char* otoken) {
     // printf("wsh_local key=%s\n", key);
     char* const val = dereference(strtok(NULL, "="));
     // printf("adding key:val as %s:%s\n", key, val);
-    add_dict_var(shell_vars, key, val);
+    if (add_dict_var(shell_vars, key, val) < 0)
+        return -1;
+    return 0;
     // print_vars();
 }
 
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
 
-int wsh_ls() {
+int wsh_ls(char** tokens, int n_tokens) {
     // printf("wsh_ls() called\n");
+    if (n_tokens != 1)
+        return -1;
+    tokens = tokens;
     struct dirent** dirs;
     int n = scandir(".", &dirs, non_hidden_dirent, alphasort);
-    if (n == -1)
-        last_exit_code = EXIT_CODE_MINUS_ONE;
-    else {
-        for (int i = 0; i < n; i++)
-            printf("%s\n", dirs[i]->d_name);
-        fflush(stdout);
-        last_exit_code = EXIT_CODE_ZERO;
-    }
-    return last_exit_code;
+    if (n == -1)    
+        return -1;
+    for (int i = 0; i < n; i++)
+        printf("%s\n", dirs[i]->d_name);
+    fflush(stdout);
+    return 0;
 }
 
-void wsh_vars() {
+int wsh_vars(char** tokens, int n_tokens) {
     // printf("wsh_vars() called\n");
+    if (n_tokens != 1)
+        return -1;
+    tokens = tokens;
     for (int i = 0; i < shell_vars->size; i++) {
         entry* dict_entry = shell_vars->entries[i];
         printf("%s=%s\n", dict_entry->key, dict_entry->val);
     }
     fflush(stdout);
+    return 0;
 }
+
+dict* builtins;
+
+bool is_builtin(const char* command) {
+    return get_dict_idx(builtins, command) != -1;
+}
+
+static int (*wshcalls[])(char**,int) = {wsh_cd,wsh_exit,wsh_export,wsh_history,wsh_local,wsh_ls,wsh_vars};
+
+int handle_builtin(char** tokens, int n_tokens) {
+    char* command = tokens[0];
+    int idx = atoi(get_dict_var(builtins, command));
+    return wshcalls[idx](tokens, n_tokens);
+}
+
 
 /*************************** BUILT-IN CALLS END ****************************/
 
@@ -710,29 +734,9 @@ int handle(char** tokens, int n_tokens) {
     char* command = tokens[0];
     // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
 
-    if (strcmp(command,"cd") == 0)
-        wsh_cd(tokens[1]);
-
-    if (strcmp(command, "exit") == 0)
-        wsh_exit();
-
-    if (strcmp(command, "export") == 0)
-        wsh_export(tokens[1]);
-
-    if (strcmp(command, "history") == 0)
-        wsh_history(tokens, n_tokens);
-
-    if (strcmp(command, "local") == 0)
-        wsh_local(tokens[1]);
-
-    if (strcmp(command, "ls") == 0)
-        wsh_ls();
-    
-    if (strcmp(command, "vars") == 0)
-        wsh_vars();
-
-
-    if (!is_builtin(command))
+    if (is_builtin(command))
+        exit_code = handle_builtin(tokens, n_tokens);
+    else
         exit_code = handle_non_builtin(tokens, n_tokens);
 
     // flush streams before next command
@@ -747,6 +751,23 @@ int handle(char** tokens, int n_tokens) {
     }
 
     return exit_code;
+}
+
+void force_exit() {
+    char* tokens[] = {"exit"};
+    wsh_exit(tokens, 1);
+}
+
+void init_builtins() {
+    builtins = create_dictionary(7);
+    add_dict_var(builtins, "cd",      "0");
+    add_dict_var(builtins, "exit",    "1");
+    add_dict_var(builtins, "export",  "2");
+    add_dict_var(builtins, "history", "3");
+    add_dict_var(builtins, "local",   "4");
+    add_dict_var(builtins, "ls",      "5");
+    add_dict_var(builtins, "vars",    "6");
+    // print_dict(builtins);
 }
 
 void init_history(int size) {
@@ -787,6 +808,7 @@ int main(int argc, char* argv[]) {
     // display(history);
     init_env_vars();
     init_shell_vars();
+    init_builtins();
     // print_vars();
 
     char *line = NULL;
@@ -840,7 +862,7 @@ int main(int argc, char* argv[]) {
         len = 0;
     }
 
-    wsh_exit();
+    force_exit();
     // printf("\n");
     return 0;
 }

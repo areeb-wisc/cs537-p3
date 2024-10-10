@@ -533,7 +533,49 @@ char* get_filename_from_path(const char* path) {
     return strncpy(filename, path + i + 1, n);
 }
 
-/*************************** BUILT-IN CALLS START ***************************/
+/*************************** NON BUILT-IN CALLS START ************************/
+
+int execute(char* path, char** argv) {
+    int pid = fork();
+    if (pid < 0) {
+        return -1;
+    } else if (pid == 0) {
+        execv(path, argv);
+        exit(-1);
+    } else {
+        if (waitpid(pid, 0, 0) == -1)
+            return -1;
+    }
+    return 0;
+}
+
+int handle_non_builtin(char** tokens, int n_tokens) {
+
+    char* command = tokens[0];
+    char** argv = tokens;
+    n_tokens = n_tokens;
+
+    if (access(command, X_OK) == 0) {
+        argv[0] = get_filename_from_path(command);
+        return execute(command, argv);
+    }
+
+    char* path = getenv("PATH");
+    char** paths = NULL;
+    int n_paths = 0;
+    tokenize(path, ":", &paths, &n_paths);
+    for (int i = 0; i < n_paths; i++) {
+        char* newpath = join(paths[i], command, '/');
+        if (access(newpath, X_OK) == 0)
+            return execute(newpath, argv);
+    }
+
+    return -1;
+}
+
+/*************************** NON BUILT-IN CALLS START ************************/
+
+/***************************** BUILT-IN CALLS START ***************************/
 
 void wsh_cd(const char* odir) {
     // printf("wsh_cd() called\n");
@@ -564,8 +606,8 @@ void wsh_export(const char* otoken) {
 }
 
 void wsh_history(char** tokens, int n_tokens) {
-    printf("wsh_history() called, n_tokens=%d\n", n_tokens);
-    display(history);
+    // printf("wsh_history() called, n_tokens=%d\n", n_tokens);
+    // display(history);
     if (n_tokens == 1)
         display(history);
     else if (n_tokens == 3)
@@ -714,9 +756,6 @@ int main(int argc, char* argv[]) {
         if (strcmp(command,"cd") == 0)
             wsh_cd(tokens[1]);
 
-        // if (strcmp(command,"env") == 0)
-        //     print_environ();
-
         if (strcmp(command, "exit") == 0)
             wsh_exit();
 
@@ -736,65 +775,7 @@ int main(int argc, char* argv[]) {
             wsh_vars();
 
         if (!is_builtin(command)) {
-            // printf("non built-in command, exec to execute\n");
-            last_exit_code = access(command, X_OK);
-            int can_execute = (last_exit_code == 0);
-            if (can_execute) {
-                // printf("can_execute = 0\n");
-                int pid = fork();
-                if (pid < 0)
-                    printf("fork failed!!\n");
-                else if (pid == 0) {
-                    char** argv = tokens;
-                    char* executable = get_filename_from_path(command);
-                    // printf("filename=%s, len=%ld\n", executable, strlen(executable));
-                    argv[0] = clone_str(executable);
-                    // printf("Child of wsh, exec into %s\n", executable);
-                    execv(command, argv);
-                    // printf("exec failed\n");
-                    exit(EXIT_FAILURE);
-                } else {
-                    int status = 0;;
-                    wait(&status);
-                    // printf("child complete, status=%d!\n", status);
-                    // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-                }
-            } else {
-                // printf("can not execute, try searching $PATH!!\n");
-                char* path = getenv("PATH");
-                // printf("PATH=%s\n", path);
-                char** paths = NULL;
-                int n_paths = 0;
-                tokenize(path, ":", &paths, &n_paths);
-                // print_strings(paths, n_paths, "\n", "PATH:\n");
-                for (int i = 0; i < n_paths; i++) {
-                    char* newpath = join(paths[i], command, '/');
-                    last_exit_code = access(newpath, X_OK);
-                    // printf("last_exit_code = %d\n", last_exit_code);
-                    // fflush(stdout);
-                    int can_execute = (last_exit_code == 0);
-                    if (can_execute) {
-                        int pid = fork();
-                        if (pid < 0)
-                            printf("fork failed!!\n");
-                        else if (pid == 0) {
-                            char** argv = tokens;
-                            // printf("newpath=%s, len=%ld\n", newpath, strlen(newpath));
-                            // printf("Child of wsh, exec into %s\n", command);
-                            // print_strings(argv, n_tokens, ",", "with argv = ");
-                            execv(newpath, argv);
-                            // printf("exec failed\n");
-                            exit(EXIT_FAILURE);
-                        } else {
-                            int status = 0;;
-                            wait(&status);
-                            break;
-                            // printf("child complete, status=%d!\n", status);
-                            // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-                        }
-                    }
-                }
-            }
+            last_exit_code = handle_non_builtin(tokens, n_tokens);
         }
 
         // flush sreams before next command

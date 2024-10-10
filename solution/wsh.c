@@ -2,16 +2,9 @@
 #define EXIT_CODE_ZERO       0
 #define EXIT_CODE_MINUS_ONE -1
 
-#include<ctype.h>
-#include<dirent.h>
-#include<limits.h>
-#include<stdarg.h>
-#include<stdbool.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-#include<sys/wait.h>
-#include<unistd.h>
 
 #include "wsh.h"
 

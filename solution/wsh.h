@@ -1,23 +1,30 @@
 #ifndef _WSH_HEADER
 #define _WSH_HEADER
 
-// #include<ctype.h>
+#include<ctype.h>
 #include<dirent.h>
-// #include<limits.h>
-// #include<stdarg.h>
-// #include<stdbool.h>
-// #include<stdio.h>
-// #include<stdlib.h>
-// #include<string.h>
-// #include<sys/wait.h>
+#include<limits.h>
+#include<stdarg.h>
+#include<stdbool.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/wait.h>
 #include<unistd.h>
 
 /******************************* DICTIONARY START *****************************/
+
+// single dictionary entry (string key, string val) 
 typedef struct Entry {
     char* key;
     char* val;
 } entry;
 
+/**
+ * Dynamic list of Entry (same as vector<Entry> in C++)
+ * size is current size, max_size is current capacity
+ * Adding a new entry to an already full dictionary doubles max_size
+ */
 typedef struct Dict {
     int size;
     int max_size;
@@ -28,7 +35,7 @@ typedef struct Dict {
 // Create a dictionary with given size
 dict* create_dictionary(int size);
 
-// Make Entry(key,val)
+// Make Entry (key,val)
 entry* make_dict_entry(const char* key, const char* val);
 
 // Double dict size if at capacity
@@ -37,7 +44,7 @@ void resize_if_needed(dict* dictionary);
 // Return index of key in dictionary if present, else -1
 int get_dict_idx(dict* dictionary, const char* key);
 
-// Add (key,val) to dict
+// Add (key,val) to dict if not present, else update dictionary[key] = val
 int add_dict_var(dict* dictionary, const char* key, const char* val);
 
 // Get dictionary[key] if present, else NULL
@@ -51,6 +58,13 @@ void print_vars();
 /********************************** DICTIONARY END *******************************/
 
 /***************************** CIRCULAR QUEUE START **********************************/
+
+/**
+ * A circular queue where each entry is a string (called word)
+ * Addition (push operation) happens at 'front' or 'f'
+ * Deletion (pop operation) happens at 'rear' of 'r'
+ * n = max size of queue
+ */
 typedef struct circular_queue {
     char** words;
     int n, r, f;

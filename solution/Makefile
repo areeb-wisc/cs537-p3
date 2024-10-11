@@ -19,7 +19,7 @@ $(TARGET)-dbg: $(SRC) $(HEADER)
 	$(CC) $(CFLAGS-dbg) $< -o $@
 
 clean:
-	rm -f $(TARGET) $(TARGET)-dbg
+	rm -f $(TARGET) $(TARGET)-dbg dict envtest cqueue
 
 dict: dict.c dict.h
 	$(CC) $(CFLAGS) $< -o $@

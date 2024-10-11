@@ -172,27 +172,34 @@ bool areEqual(const char* str1, const char* str2) {
 
 int main() {
 
-    dict* mydicts = (dict*)malloc(sizeof(dict));
-    mydicts->size = 0;
-    mydicts->max_size = 1;
-    mydicts->entries = (entry**)malloc(mydicts->max_size * sizeof(entry*));
+    char* otoken = "a";
+    char* const token = clone_str(otoken);
+    char* const key = strtok(token, "=");
+    char* const val = strtok(NULL, "=");
 
-    for (int i = 0; i < n_builtins; i++) {
-        const char* key = builtins[i];
-        char num = (char)(i + 48);
-        char* val = &num;
-        add_entry(mydicts, key, val);
-    }
+    printf("key=%s, val=%s\n", key, val);
 
-    // print_dict(mydicts);
+    // dict* mydicts = (dict*)malloc(sizeof(dict));
+    // mydicts->size = 0;
+    // mydicts->max_size = 1;
+    // mydicts->entries = (entry**)malloc(mydicts->max_size * sizeof(entry*));
 
-    handle_builtin(mydicts, "cd");
-    handle_builtin(mydicts, "exit");
-    handle_builtin(mydicts, "export");
-    handle_builtin(mydicts, "history");
-    handle_builtin(mydicts, "local");
-    handle_builtin(mydicts, "ls");
-    handle_builtin(mydicts, "vars");
+    // for (int i = 0; i < n_builtins; i++) {
+    //     const char* key = builtins[i];
+    //     char num = (char)(i + 48);
+    //     char* val = &num;
+    //     add_entry(mydicts, key, val);
+    // }
+
+    // // print_dict(mydicts);
+
+    // handle_builtin(mydicts, "cd");
+    // handle_builtin(mydicts, "exit");
+    // handle_builtin(mydicts, "export");
+    // handle_builtin(mydicts, "history");
+    // handle_builtin(mydicts, "local");
+    // handle_builtin(mydicts, "ls");
+    // handle_builtin(mydicts, "vars");
 
     // int n_paths = 8;
     // char* paths[] = {""," ","path","/","/path","/path/","/path/file","/path/file/"};

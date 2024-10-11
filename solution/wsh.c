@@ -143,14 +143,6 @@ int getsize(cqueue* cq) {
     return cq->r + 1 + cq->n - cq->f;
 }
 
-void print(cqueue* cq, int no) {
-    char* word = get(cq, no);
-    if (word == NULL)
-        printf("NULL\n");
-    else
-        printf("%s\n", word);
-}
-
 void display(cqueue* cq) {
     int i = cq->r, k = 0, size = getsize(cq);
     while (k < size) {

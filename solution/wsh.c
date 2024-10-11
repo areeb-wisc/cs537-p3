@@ -639,7 +639,8 @@ int main(int argc, char* argv[]) {
     fflush(stdin);
     fflush(NULL);
     if (argc == 2) {
-        redirect_fd_to_file(STDIN_FILENO, argv[1], "r");
+        if (redirect_fd_to_file(STDIN_FILENO, argv[1], "r") < 0)
+            exit(-1);
         copy_in = dup(STDIN_FILENO);
         wsh_prompt = "";
     }

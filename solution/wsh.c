@@ -134,11 +134,6 @@ void print_vars() {
 
 /***************************** HISTORY START **********************************/
 
-// typedef struct circular_queue {
-//     char** words;
-//     int n, r, f;
-// } cqueue;
-
 cqueue* create_cqueue(int size) {
     // printf("init\n");
     cqueue* cq = (cqueue*)malloc(sizeof(cqueue));
@@ -154,14 +149,14 @@ cqueue* history;
 char* get(cqueue* cq, int no) {
     if (no < 1 || no > cq->n)
         return NULL;
-    int i = (cq->f - (no - 1) + cq->n) % cq->n;
+    int i = (cq->r - (no - 1) + cq->n) % cq->n;
     bool is_valid = false;
-    if (cq->f == cq->r)
-        is_valid = (i == cq->f);
-    else if (cq->r < cq->f)
-        is_valid = (cq->r <= i && i <= cq->f);
+    if (cq->r == cq->f)
+        is_valid = (i == cq->r);
+    else if (cq->f < cq->r)
+        is_valid = (cq->f <= i && i <= cq->r);
     else
-        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
+        is_valid = (0 <= i && i <= cq->r) || (cq->f <= i && i < cq->n);
     if (is_valid)
         return clone_str(cq->words[i]);
     return NULL;
@@ -171,13 +166,13 @@ void push(cqueue* cq, const char* word) {
     // printf("push %s\n", word);
     if (cq->n == 0)
         return;
-    char* front = get(cq, 1);
-    if (front != NULL && strcmp(word, front) == 0)
+    char* rear = get(cq, 1);
+    if (rear != NULL && strcmp(word, rear) == 0)
         return;
-    if (cq->r == -1 || cq->r == (cq->f + 1) % cq->n)
-        cq->r = (cq->r + 1) % cq->n;
-    cq->f = (cq->f + 1) % cq->n;
-    cq->words[cq->f] = clone_str(word);
+    if (cq->f == -1 || cq->f == (cq->r + 1) % cq->n)
+        cq->f = (cq->f + 1) % cq->n;
+    cq->r = (cq->r + 1) % cq->n;
+    cq->words[cq->r] = clone_str(word);
 }
 
 void pop(cqueue* cq) {
@@ -186,15 +181,15 @@ void pop(cqueue* cq) {
         cq->f = -1;
         cq->r = -1;
     } else
-        cq->r = (cq->r + 1) % cq->n;
+        cq->f = (cq->f + 1) % cq->n;
 }
 
 int getsize(cqueue* cq) {
-    if (cq->f == -1)
+    if (cq->r == -1)
         return 0;
-    if (cq->f >= cq->r)
-        return cq->f - cq->r + 1;
-    return cq->f + 1 + cq->n - cq->r;
+    if (cq->r >= cq->f)
+        return cq->r - cq->f + 1;
+    return cq->r + 1 + cq->n - cq->f;
 }
 
 void print(cqueue* cq, int no) {
@@ -208,7 +203,7 @@ void print(cqueue* cq, int no) {
 void display(cqueue* cq) {
     // printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
     // printf("history->words:\n");
-    int i = cq->f, k = 0, size = getsize(cq);
+    int i = cq->r, k = 0, size = getsize(cq);
     while (k < size) {
         printf("%d) %s\n", ++k, cq->words[i]);
         i = (i - 1 + cq->n) % cq->n;
@@ -227,15 +222,15 @@ void resize(cqueue** cq, int size) {
 
     if (size < (*cq)->n) {
         int drop = getsize(*cq) - size;
-        printf("dropping %d items\n", drop);
+        // printf("dropping %d items\n", drop);
         while(drop--)
             pop(*cq);
     }
     
     cqueue* newcq = create_cqueue(size);
 
-    int i = (*cq)->r, oldsize = getsize(*cq);
-    printf("adding %d items\n", oldsize);
+    int i = (*cq)->f, oldsize = getsize(*cq);
+    // printf("adding %d items\n", oldsize);
     while (oldsize--) {
         push(newcq, (*cq)->words[i]);
         i = (i + 1) % (*cq)->n;
@@ -722,6 +717,8 @@ int handle(char** tokens, int n_tokens) {
     
     // Step 4: perform I/O redirection if any
     exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
+    if (exit_code < 0)
+        return exit_code;
 
     // perror("standard error message\n");
     // printf("n_tokens after redirection: %d\n", n_tokens);

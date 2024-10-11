@@ -199,7 +199,7 @@ bool is_builtin(const char* command);
 int handle_builtin(char**,int);
 /*************************** BUILT-IN CALLS END ****************************/
 
-/*************************** MAIN DECLARATIONS ****************************/
+/*************************** MAIN HELPERS START ****************************/
 
 // generic handler for any command
 int handle(char** tokens, int n_tokens);
@@ -218,5 +218,7 @@ void init_shell_vars();
 
 // call exit for Ctrl+D or EOF
 void force_exit();
+
+/*************************** MAIN HELPERS END ****************************/
 
 #endif

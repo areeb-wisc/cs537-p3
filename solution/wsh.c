@@ -8,42 +8,19 @@
 
 #include "wsh.h"
 
-bool interactive = true;
-int initial_history_size = 5;
-const char* wsh_prompt = "wsh> ";
-// const int n_builtins = 7;
-// const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
-int last_exit_code = EXIT_CODE_ZERO;
+int initial_history_size = 5; // --------- initial history size set to 5
+const char* wsh_prompt = "wsh> "; // ----- const wsh prompt "wsh> "
+int last_exit_code = EXIT_CODE_ZERO; // -- global last seen exit_code
 
-int copy_in;
-int copy_out;
-int copy_err;
+int copy_in; // -------------------------- copy of stdin for resetting
+int copy_out; // ------------------------- copy of stdout for resetting
+int copy_err; // ------------------------- copy of stderr for resetting
 
-dict* shell_vars;
-cqueue* history;
-
-// Clone a string
-char* clone_str(const char* str) {
-    char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
-    strcpy(clone, str);
-    return clone;
-}
+dict* shell_vars; // --------------------- dictionary to hold shell local variables               
+cqueue* history; // ---------------------- circular queue to store history
+dict* builtins; // ----------------------- dictionary to hold builtins
 
 /******************************* DICTIONARY START *****************************/
-
-// typedef struct Entry {
-//     char* key;
-//     char* val;
-// } entry;
-
-// typedef struct Dict {
-//     int size;
-//     int max_size;
-//     entry** entries;
-
-// } dict;
-
-dict* shell_vars;
 
 dict* create_dictionary(int maxsize) {
     dict* dictionary = (dict*)malloc(sizeof(dict));
@@ -67,7 +44,6 @@ void resize_if_needed(dict* dictionary) {
     }
 }
 
-// Return index of key in dictionary if present, else -1 
 int get_dict_idx(dict* dictionary, const char* key) {
     for (int i = 0; i < dictionary->size; i++) {
         if (strcmp(dictionary->entries[i]->key, key) == 0)
@@ -96,48 +72,11 @@ char* get_dict_var(dict* dictionary, const char* key) {
     return (idx != -1) ? clone_str(dictionary->entries[idx]->val) : NULL;
 }
 
-void print_strings(char** array, int size, char* delim, char* message) {
-    printf("%s", message);
-    for (int i = 0; i < size + 1; i++) {
-        if (array[i] == NULL)
-            printf("NULL");
-        else
-            printf("%s%s", array[i], delim);
-    }
-    printf("\n");
-}
-
-// TODO(Areeb): remove these later
-void print_environ() {
-    printf("environ=");
-    printf("{");
-    for (int i = 0; environ[i] != NULL; i++)
-        printf("%s,", environ[i]);
-    printf("}\n");
-}
-
-
-void print_dict(dict* dictionary) {
-    printf("size=%d, max_size=%d, dict=", dictionary->size, dictionary->max_size);
-    printf("{");
-    for (int i = 0; i < dictionary->size; i++) {
-        entry* dict_entry = dictionary->entries[i];
-        printf("%s:%s,", dict_entry->key, dict_entry->val);
-    }
-    printf("}\n");
-}
-
-void print_vars() {
-    print_environ();
-    print_dict(shell_vars);
-}
-
 /********************************** DICTIONARY END *******************************/
 
 /***************************** HISTORY START **********************************/
 
 cqueue* create_cqueue(int size) {
-    // printf("init\n");
     cqueue* cq = (cqueue*)malloc(sizeof(cqueue));
     cq->n = size;
     cq->r = -1;
@@ -165,7 +104,6 @@ char* get(cqueue* cq, int no) {
 }
 
 void push(cqueue* cq, const char* word) {
-    // printf("push %s\n", word);
     if (cq->n == 0)
         return;
     char* rear = get(cq, 1);
@@ -178,7 +116,6 @@ void push(cqueue* cq, const char* word) {
 }
 
 void pop(cqueue* cq) {
-    // printf("pop\n");
     if (cq->f == cq->r) {
         cq->f = -1;
         cq->r = -1;
@@ -203,45 +140,30 @@ void print(cqueue* cq, int no) {
 }
 
 void display(cqueue* cq) {
-    // printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
-    // printf("history->words:\n");
     int i = cq->r, k = 0, size = getsize(cq);
     while (k < size) {
         printf("%d) %s\n", ++k, cq->words[i]);
         i = (i - 1 + cq->n) % cq->n;
     }
-    // printf("\n");
+    fflush(stdout);
 }
 
 void resize(cqueue** cq, int size) {
-
-    printf("resize to %d\n", size);
-    if (size == (*cq)->n)
+    if (size < 0 || size == (*cq)->n)
         return;
-    
-    if (size < 0)
-        return;
-
     if (size < (*cq)->n) {
         int drop = getsize(*cq) - size;
-        // printf("dropping %d items\n", drop);
         while(drop--)
             pop(*cq);
     }
-    
     cqueue* newcq = create_cqueue(size);
-
     int i = (*cq)->f, oldsize = getsize(*cq);
-    // printf("adding %d items\n", oldsize);
     while (oldsize--) {
         push(newcq, (*cq)->words[i]);
         i = (i + 1) % (*cq)->n;
     }
-    
-    display(newcq);
     free(*cq);
     *cq = newcq;
-
 }
 
 /**************************** HISTORY END ************************************/
@@ -270,6 +192,12 @@ void dereference_tokens(char*** varnames, int n_varnames) {
 /********************* VARNAME DEREFERENCING HELPERS END ********************/
 
 /******************************* STRING HELPERS START ****************************/
+
+char* clone_str(const char* str) {
+    char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
+    strcpy(clone, str);
+    return clone;
+}
 
 void strip(char** word, ssize_t* len) {
     if (*len > 0) {
@@ -315,14 +243,11 @@ void promptf(char* fmtstr, ...) {
 void tokenize(const char* oline, const char* delim, char*** ptokens, int* n_tokens) {
 
     char* const line = clone_str(oline);
-    // printf("tokenize\n");
     int buff_size = 0;
     int max_buff_size = 1;
     char** tokens = (char**)malloc(buff_size * sizeof(char*));
 
-    // printf("right before strtok\n");
     char* token = strtok(line, delim);
-    // printf("right after strtok\n");
     while (token != NULL) {
         buff_size++;
         if (buff_size > max_buff_size) {
@@ -337,7 +262,6 @@ void tokenize(const char* oline, const char* delim, char*** ptokens, int* n_toke
 
     *ptokens = tokens; // list of all token strings (including NULL)
     *n_tokens = buff_size; // size does not include NULL
-    // printf("tokenize complete\n");
 }
 
 /**
@@ -358,45 +282,29 @@ char* join(const char* str1, const char* str2, const char joiner) {
 }
 
 int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
-    // printf("opening %s\n", file_name);
-    
     FILE* file = fopen(file_name, mode);
-    // printf("opened %s in %s mode\n", file_name, mode);
     if (file == NULL)
         return -1;
-    // int fno = fileno(file);
-    // printf("valid fileno: %d\n", fno);
     if (dup2(fileno(file), fd) < 0)
         return -1;
-    // printf("dup2 success\n");
     if (close(fileno(file)) < 0)
         return -1;
-    // printf("close() success\n");
     return 0;
 }
 
 int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
-    
     char* last_token = clone_str((*tokens)[*n_tokens - 1]);
-
-    // printf("---------------------------------------------------\n");
-    // printf("last_token: %s\n", last_token);
-
     bool redirection = false;
-
     int fd = -1;
     char* file_name = NULL;
     char* mode = NULL;
     char *found1 = NULL, *found2 = NULL, *found3 = NULL;
-
     // Check for &> and &>>
     found1 = strstr(last_token, "&>");
     // Check for > and >>
     found2 = strstr(last_token, ">");
     // Check for <
     found3 = strstr(last_token, "<");
-
-
     if (found1 != NULL) { // found &> (could be &>> also)
         redirection = true;
         if (found1 != last_token) // [n]&> is invalid
@@ -418,17 +326,11 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
         fflush(stderr);
         if (redirect_fd_to_file(STDERR_FILENO, file_name, mode) < 0)
             return -1;
-    }
-    
-    else if (found2 != NULL) { // found > (could also be >>)
-        // printf("found >\n");
+    } else if (found2 != NULL) { // found > (could also be >>)
         redirection = true;
-
         if (strlen(found2) == 1) // [n]>word without word is invalid
-            return -1;
-        
+            return -1;        
         if (*(found2 + 1) == '>') { // >> found
-            // printf("found >>\n");
             if (strlen(found2) == 2) // [n]>>word without word is invalid
                 return -1;
             file_name = dereference(found2 + 2);
@@ -437,32 +339,19 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             file_name = dereference(found2 + 1);
             mode = "w";
         }
-
-        
         if (found2 == last_token) // [n]>word, n = 1 then
             fd = STDOUT_FILENO;
         else {
             int len_fd = found2 - last_token;
-            // printf("len_fd = %d\n", len_fd);
             char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
             strncpy(fdstr, last_token, len_fd);
-            // printf("fdstr = %s\n", fdstr);
             fd = atoi(fdstr);
-            // printf("fd = %d\n", fd);
         }
-
-        // int flushed = fflush(stdout);
-        // printf("flushed = %d\n", flushed);
-        // printf("fd = %d, file_name = %s\n", fd, file_name);
-        // printf("fd = %d, file_name = %s, mode = %s\n", fd, file_name, mode);
         fflush(stdout);
         if (redirect_fd_to_file(fd, file_name, mode) < 0)
             return -1;
-    }
-
-    else if (found3 != NULL) { // < found
+    } else if (found3 != NULL) { // < found
         redirection = true;
-
         if (strlen(found3) == 1) // [n]<word without word is invalid
             return -1;
         file_name = dereference(found3 + 1);
@@ -478,17 +367,12 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
         if (redirect_fd_to_file(fd, file_name, "r") < 0)
             return -1;
     }
-
     if (redirection) {
-        // printf("redirection attempt successful\n");
         free((*tokens)[*n_tokens]);
-        // printf("free() successful\n");
         (*tokens)[*n_tokens - 1] = NULL;
         *n_tokens -= 1;
-        // printf("reduction successful\n");
     }
     *success = redirection;
-    // printf("---------------------------------------------------\n");
     return 0;
 }
 
@@ -502,15 +386,12 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
  * e.g. / -> [empty string]
  */
 char* get_filename_from_path(const char* path) {
-    
     if (path == NULL)
         return NULL;
-    
     int pathlen = strlen(path);
     int i = pathlen - 1;
     while (i >= 0 && path[i] != '/')
         i--;
-    
     int n = pathlen - i - 1;
     char* filename = (char*)malloc((n + 1) * sizeof(char));
     return strncpy(filename, path + i + 1, n);
@@ -533,17 +414,13 @@ int execute(char* path, char** argv) {
 }
 
 int handle_non_builtin(char** tokens, int n_tokens) {
-
-    // printf("handle non_built-in\n");
     char* command = tokens[0];
     char** argv = tokens;
     n_tokens = n_tokens;
-
     if (access(command, X_OK) == 0) {
         argv[0] = get_filename_from_path(command);
         return execute(command, argv);
     }
-
     char* path = getenv("PATH");
     char** paths = NULL;
     int n_paths = 0;
@@ -553,7 +430,6 @@ int handle_non_builtin(char** tokens, int n_tokens) {
         if (access(newpath, X_OK) == 0)
             return execute(newpath, argv);
     }
-
     return -1;
 }
 
@@ -564,37 +440,25 @@ int handle_non_builtin(char** tokens, int n_tokens) {
 int wsh_cd(char** tokens, int n_tokens) {
     if (n_tokens < 1 || n_tokens > 2)
         return -1;
-    // printf("wsh_cd() called\n");
     char* odir = tokens[1];
     char* const dir = dereference(odir);
-    // char* cwd = getcwd(NULL, 0);
-    // printf("cwd before cd ../ = %s\n", cwd);
-    // printf("running cd %s...\n", dir);
     if (chdir(dir) < 0)
         return -1;
     return 0;
-    // cwd = getcwd(NULL, 0);
-    // printf("last_exit_code = %d\n", last_exit_code);
-    // printf("cwd after cd ../ = %s\n", cwd);
 }
 
 int wsh_exit(char** tokens, int n_tokens) {
     if (n_tokens != 1)
         return -1;
-    // printf("wsh_exit() called\n");
-    // last_exit_code ? exit(EXIT_CODE_MINUS_ONE) : exit(EXIT_CODE_ZERO);
-    // printf("last_exit_code from wsh_exit() = %d\n", last_exit_code);
     tokens = tokens;
     exit(last_exit_code);
     return 0;
 }
 
-// TODO(Areeb): [export a] should give error 
 int wsh_export(char** tokens, int n_tokens) {
     if (n_tokens != 2)
         return -1;
     const char* otoken = tokens[1];
-    // printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
     char* const key = strtok(token, "=");
     const char* val = strtok(NULL, "=");
@@ -604,15 +468,10 @@ int wsh_export(char** tokens, int n_tokens) {
         val = "";
     }
     val = dereference(val);
-    // printf("exporting %s=%s\n", key, val);
     if(setenv(key, val, 1) < 0)
         return -1;
-    // printf("exported getenv(%s)=%s\n", key, getenv(key));
     return 0;
-    // print_vars();
 }
-
-int handle(char**, int);
 
 bool isValidNumber(const char* numstr) {
     if (numstr == NULL || strlen(numstr) == 0)
@@ -625,27 +484,23 @@ bool isValidNumber(const char* numstr) {
 }
 
 int wsh_history(char** tokens, int n_tokens) {
-    // printf("wsh_history() called, n_tokens=%d\n", n_tokens);
-    // display(history);
     if (n_tokens < 1 || n_tokens > 3)
         return -1;
-
-    if (n_tokens == 1)
+    if (n_tokens == 1) // [history]
         display(history);
-    else if (n_tokens == 3) {
+    else if (n_tokens == 3) { // [history set <n>]
         if (strcmp(tokens[1],"set") != 0)
             return -1;
         if (!isValidNumber(tokens[2]))
             return -1;
         resize(&history, atoi(tokens[2]));
-    } else {
+    } else { // [history n]
         if (!isValidNumber(tokens[1]))
             return -1;
         int line_number = atoi(tokens[1]);
         char* line = get(history, line_number);
-        if (line == NULL)
+        if (line == NULL) // ignoring unpopulated entries
             return 0;
-        // printf("executing from history: %s\n", line);
         char** line_tokens = NULL;
         int n_line_tokens = 0;
         tokenize(line, " ", &line_tokens, &n_line_tokens);
@@ -654,16 +509,12 @@ int wsh_history(char** tokens, int n_tokens) {
     return 0;
 }
 
-// TODO(Areeb): [local a] should give error
 int wsh_local(char** tokens, int n_tokens) {
     if (n_tokens != 2)
         return -1;
     const char* otoken = tokens[1];
-    // printf("wsh_local() called\n");
     char* const token = clone_str(otoken);
-    // printf("wsh_local(%s)\n", token);
     char* const key = strtok(token, "=");
-    // printf("wsh_local key=%s\n", key);
     const char* val = strtok(NULL, "=");
     if (val == NULL) { // either [local abc] OR [local abc=] case
         if (otoken[strlen(otoken) - 1] != '=') // [local abc] is invalid
@@ -671,17 +522,14 @@ int wsh_local(char** tokens, int n_tokens) {
         val = "";
     }
     val = dereference(val);
-    // printf("adding key:val as %s:%s\n", key, val);
     if (add_dict_var(shell_vars, key, val) < 0)
         return -1;
     return 0;
-    // print_vars();
 }
 
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
 
 int wsh_ls(char** tokens, int n_tokens) {
-    // printf("wsh_ls() called\n");
     if (n_tokens != 1)
         return -1;
     tokens = tokens;
@@ -696,7 +544,6 @@ int wsh_ls(char** tokens, int n_tokens) {
 }
 
 int wsh_vars(char** tokens, int n_tokens) {
-    // printf("wsh_vars() called\n");
     if (n_tokens != 1)
         return -1;
     tokens = tokens;
@@ -708,13 +555,9 @@ int wsh_vars(char** tokens, int n_tokens) {
     return 0;
 }
 
-dict* builtins;
-
 bool is_builtin(const char* command) {
     return get_dict_idx(builtins, command) != -1;
 }
-
-// static int (*wshcalls[])(char**,int) = {wsh_cd,wsh_exit,wsh_export,wsh_history,wsh_local,wsh_ls,wsh_vars};
 
 int handle_builtin(char** tokens, int n_tokens) {
     char* command = tokens[0];
@@ -722,44 +565,44 @@ int handle_builtin(char** tokens, int n_tokens) {
     return wshcalls[idx](tokens, n_tokens);
 }
 
-
 /*************************** BUILT-IN CALLS END ****************************/
 
+/*************************** MAIN HELPERS START ****************************/
+
+int reset_redirection() {
+    if (dup2(copy_in, STDIN_FILENO) < 0)
+        return -1;
+    if (dup2(copy_out, STDOUT_FILENO) < 0)
+        return -1;
+    if (dup2(copy_err, STDERR_FILENO) < 0)
+        return -1;
+    return 0;
+}
+
 int handle(char** tokens, int n_tokens) {
-
     int exit_code = -1;
-    bool redirection = false;
-    
     // Step 4: perform I/O redirection if any
+    bool redirection = false;    
     exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
-    if (exit_code < 0)
-        return exit_code;
-
-    // perror("standard error message\n");
-    // printf("n_tokens after redirection: %d\n", n_tokens);
-    // print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
-
+    if (exit_code  < 0) {
+        // reset any redirection
+        if (redirection)
+            reset_redirection();
+        return -1;
+    }
     // Step 5: expand all variables
     dereference_tokens(&tokens, n_tokens);
-    char* command = tokens[0];
-    // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
-
-    if (is_builtin(command))
+    // Step 6: handle built-in / non built-in command
+    if (is_builtin(tokens[0]))
         exit_code = handle_builtin(tokens, n_tokens);
     else
         exit_code = handle_non_builtin(tokens, n_tokens);
-
     // flush streams before next command
     fflush(stdin);
     fflush(NULL);
-
     // reset any redirection
-    if (redirection) {
-        dup2(copy_in, STDIN_FILENO);
-        dup2(copy_out, STDOUT_FILENO);
-        dup2(copy_err, STDERR_FILENO);
-    }
-
+    if (redirection)
+        exit_code = reset_redirection();
     return exit_code;
 }
 
@@ -777,102 +620,59 @@ void init_builtins() {
     add_dict_var(builtins, "local",   "4");
     add_dict_var(builtins, "ls",      "5");
     add_dict_var(builtins, "vars",    "6");
-    // print_dict(builtins);
 }
 
-void init_history(int size) {
-    history = create_cqueue(size);
-}
+void init_history(int size) { history = create_cqueue(size); }
 
-void init_env_vars() {
-    last_exit_code = putenv("PATH=/bin");
-}
+void init_env_vars() { last_exit_code = putenv("PATH=/bin"); }
 
-void init_shell_vars() {
-    shell_vars = create_dictionary(5);
-}
+void init_shell_vars() { shell_vars = create_dictionary(5); }
+
+/*************************** MAIN HELPERS END ****************************/
 
 int main(int argc, char* argv[]) {
-
-    // printf("argc = %d\n", argc);
-    // print_strings(argv, argc, ", ", "argv=");
-
     if (argc < 1 || argc > 2)
         exit(-1);
-
     copy_in = dup(STDIN_FILENO);
     copy_out = dup(STDOUT_FILENO);
     copy_err = dup(STDERR_FILENO);
-
     fflush(stdin);
     fflush(NULL);
-
     if (argc == 2) {
-        interactive = false;
         redirect_fd_to_file(STDIN_FILENO, argv[1], "r");
         copy_in = dup(STDIN_FILENO);
         wsh_prompt = "";
     }
-
     init_history(initial_history_size);
-    // display(history);
     init_env_vars();
     init_shell_vars();
     init_builtins();
-    // print_vars();
-
     char *line = NULL;
     size_t len = 0;
     ssize_t read;
-
     promptf("");
-
     // Step 1: take user input
     while ((read = getline(&line, &len, stdin)) != -1) {
-
         strip(&line, &read); // strip trailing whitespaces
-
         if (read == 0) { // ignore blank input lines
             promptf("");
             continue;
         }
-
         if (line[0] == '#') { // ignore comments
             promptf("");
             continue;
         }
-
-        // promptf("line = %s\n", line);
-
         // Step 2: tokenize without variable expansion
         int n_tokens = 0;
         char** tokens = NULL;
         tokenize(line, " ", &tokens, &n_tokens);
-
-        // printf("command: %s\n", command);
-        // printf("n_tokens: %d\n", n_tokens);
-        // print_strings(tokens, n_tokens, ",", "tokens = ");
-
         // Step 3: record history for non built-in commands
-        if (!is_builtin(tokens[0])) {
-            // record history
-            // TODO(Areeb): display is reverse of what it should be
-            // TODO(Areeb): local x=pwd; $x is not working
+        if (!is_builtin(tokens[0]))
             push(history, line);
-            // display(history);
-        }
-
         last_exit_code = handle(tokens, n_tokens);
-        // printf("last_exit_code = %d\n", last_exit_code);
-
         promptf("");
-
-        free(line);
-        line = NULL;
-        len = 0;
+        free(line); line = NULL; len = 0;
     }
-
     force_exit();
-    // printf("\n");
     return 0;
 }

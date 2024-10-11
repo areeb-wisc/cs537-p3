@@ -2,26 +2,25 @@
 #define EXIT_CODE_ZERO       0
 #define EXIT_CODE_MINUS_ONE -1
 
-#include<ctype.h>
-#include<dirent.h>
-#include<limits.h>
-#include<stdarg.h>
-#include<stdbool.h>
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-#include<sys/wait.h>
-#include<unistd.h>
+
+#include "wsh.h"
 
 bool interactive = true;
+int initial_history_size = 5;
 const char* wsh_prompt = "wsh> ";
-const int n_builtins = 7;
-const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
+// const int n_builtins = 7;
+// const char* builtins[] = {"cd", "exit", "export", "history", "local", "ls", "vars"};
 int last_exit_code = EXIT_CODE_ZERO;
 
-FILE* fd_in = NULL;
-FILE* fd_out = NULL;
-FILE* fd_err = NULL;
+int copy_in;
+int copy_out;
+int copy_err;
+
+dict* shell_vars;
+cqueue* history;
 
 // Clone a string
 char* clone_str(const char* str) {
@@ -32,64 +31,69 @@ char* clone_str(const char* str) {
 
 /******************************* DICTIONARY START *****************************/
 
-typedef struct Entry {
-    char* key;
-    char* val;
-} entry;
+// typedef struct Entry {
+//     char* key;
+//     char* val;
+// } entry;
 
-typedef struct Dict {
-    int size;
-    int max_size;
-    entry** entries;
+// typedef struct Dict {
+//     int size;
+//     int max_size;
+//     entry** entries;
 
-} dict;
+// } dict;
 
 dict* shell_vars;
 
-// Return index of key in dictionary if present, else -1 
-int get_shell_var_idx(const char* key) {
-    for (int i = 0; i < shell_vars->size; i++) {
-        if (strcmp(shell_vars->entries[i]->key, key) == 0)
-            return i;
-    }
-    return -1;
+dict* create_dictionary(int maxsize) {
+    dict* dictionary = (dict*)malloc(sizeof(dict));
+    dictionary->size = 0;
+    dictionary->max_size = maxsize;
+    dictionary->entries = (entry**)malloc(dictionary->max_size * sizeof(entry*));
+    return dictionary;
 }
 
-entry* make_shell_var_entry(const char* key, const char* val) {
+entry* make_dict_entry(const char* key, const char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
     new_entry->val = clone_str(val);
     return new_entry;
 }
 
-void resize_if_needed() {
-    if (shell_vars->size > shell_vars->max_size) {
-        shell_vars->max_size *= 2;
-        shell_vars->entries = (entry**)realloc(shell_vars->entries, shell_vars->max_size * sizeof(entry*));
+void resize_if_needed(dict* dictionary) {
+    if (dictionary->size > dictionary->max_size) {
+        dictionary->max_size *= 2;
+        dictionary->entries = (entry**)realloc(dictionary->entries, dictionary->max_size * sizeof(entry*));
     }
 }
 
-int add_shell_var(const char* key, const char* val) {
+// Return index of key in dictionary if present, else -1 
+int get_dict_idx(dict* dictionary, const char* key) {
+    for (int i = 0; i < dictionary->size; i++) {
+        if (strcmp(dictionary->entries[i]->key, key) == 0)
+            return i;
+    }
+    return -1;
+}
+
+int add_dict_var(dict* dictionary, const char* key, const char* val) {
     if (key == NULL || strlen(key) == 0 || val == NULL)
         return -1;
-    int idx = get_shell_var_idx(key);
+    int idx = get_dict_idx(dictionary, key);
     if (idx == -1) { // add new entry
-        shell_vars->size++;
-        resize_if_needed();
-        shell_vars->entries[shell_vars->size - 1] = make_shell_var_entry(key, val);
+        dictionary->size++;
+        resize_if_needed(dictionary);
+        dictionary->entries[dictionary->size - 1] = make_dict_entry(key, val);
     } else // update existing entry
-        shell_vars->entries[idx]->val = clone_str(val);
+        dictionary->entries[idx]->val = clone_str(val);
     return 0;
 }
 
-char* get_shell_var(const char* key) {
-    int idx = get_shell_var_idx(key);
-    return (idx != -1) ? clone_str(shell_vars->entries[idx]->val) : NULL;
-}
-
-char* get_var(const char* key) {
-    char* env_result = getenv(key);
-    return (env_result != NULL) ? env_result : get_shell_var(key);
+char* get_dict_var(dict* dictionary, const char* key) {
+    if (key == NULL)
+        return NULL;
+    int idx = get_dict_idx(dictionary, key);
+    return (idx != -1) ? clone_str(dictionary->entries[idx]->val) : NULL;
 }
 
 void print_strings(char** array, int size, char* delim, char* message) {
@@ -113,11 +117,11 @@ void print_environ() {
 }
 
 
-void print_shell_vars() {
-    printf("size=%d, max_size=%d, dict=", shell_vars->size, shell_vars->max_size);
+void print_dict(dict* dictionary) {
+    printf("size=%d, max_size=%d, dict=", dictionary->size, dictionary->max_size);
     printf("{");
-    for (int i = 0; i < shell_vars->size; i++) {
-        entry* dict_entry = shell_vars->entries[i];
+    for (int i = 0; i < dictionary->size; i++) {
+        entry* dict_entry = dictionary->entries[i];
         printf("%s:%s,", dict_entry->key, dict_entry->val);
     }
     printf("}\n");
@@ -125,24 +129,21 @@ void print_shell_vars() {
 
 void print_vars() {
     print_environ();
-    print_shell_vars();
+    print_dict(shell_vars);
 }
 
 /********************************** DICTIONARY END *******************************/
 
 /***************************** HISTORY START **********************************/
 
-typedef struct circular_queue {
-    char** words;
-    int n, r, f;
-} cqueue;
-
-void init(cqueue* cq, int size) {
+cqueue* create_cqueue(int size) {
     // printf("init\n");
+    cqueue* cq = (cqueue*)malloc(sizeof(cqueue));
     cq->n = size;
     cq->r = -1;
     cq->f = -1;
     cq->words = (char**)malloc(size * sizeof(char*));
+    return cq;
 }
 
 cqueue* history;
@@ -150,14 +151,14 @@ cqueue* history;
 char* get(cqueue* cq, int no) {
     if (no < 1 || no > cq->n)
         return NULL;
-    int i = (cq->f - (no - 1) + cq->n) % cq->n;
+    int i = (cq->r - (no - 1) + cq->n) % cq->n;
     bool is_valid = false;
-    if (cq->f == cq->r)
-        is_valid = (i == cq->f);
-    else if (cq->r < cq->f)
-        is_valid = (cq->r <= i && i <= cq->f);
+    if (cq->r == cq->f)
+        is_valid = (i == cq->r);
+    else if (cq->f < cq->r)
+        is_valid = (cq->f <= i && i <= cq->r);
     else
-        is_valid = (0 <= i && i <= cq->f) || (cq->r <= i && i < cq->n);
+        is_valid = (0 <= i && i <= cq->r) || (cq->f <= i && i < cq->n);
     if (is_valid)
         return clone_str(cq->words[i]);
     return NULL;
@@ -165,13 +166,15 @@ char* get(cqueue* cq, int no) {
 
 void push(cqueue* cq, const char* word) {
     // printf("push %s\n", word);
-    char* front = get(cq, 1);
-    if (front != NULL && strcmp(word, front) == 0)
+    if (cq->n == 0)
         return;
-    if (cq->r == -1 || cq->r == (cq->f + 1) % cq->n)
-        cq->r = (cq->r + 1) % cq->n;
-    cq->f = (cq->f + 1) % cq->n;
-    cq->words[cq->f] = clone_str(word);
+    char* rear = get(cq, 1);
+    if (rear != NULL && strcmp(word, rear) == 0)
+        return;
+    if (cq->f == -1 || cq->f == (cq->r + 1) % cq->n)
+        cq->f = (cq->f + 1) % cq->n;
+    cq->r = (cq->r + 1) % cq->n;
+    cq->words[cq->r] = clone_str(word);
 }
 
 void pop(cqueue* cq) {
@@ -180,15 +183,15 @@ void pop(cqueue* cq) {
         cq->f = -1;
         cq->r = -1;
     } else
-        cq->r = (cq->r + 1) % cq->n;
+        cq->f = (cq->f + 1) % cq->n;
 }
 
 int getsize(cqueue* cq) {
-    if (cq->f == -1)
+    if (cq->r == -1)
         return 0;
-    if (cq->f >= cq->r)
-        return cq->f - cq->r + 1;
-    return cq->f + 1 + cq->n - cq->r;
+    if (cq->r >= cq->f)
+        return cq->r - cq->f + 1;
+    return cq->r + 1 + cq->n - cq->f;
 }
 
 void print(cqueue* cq, int no) {
@@ -202,9 +205,9 @@ void print(cqueue* cq, int no) {
 void display(cqueue* cq) {
     // printf("n = %d, r = %d, f = %d\n", cq->n, cq->r, cq->f);
     // printf("history->words:\n");
-    int i = cq->f, size = getsize(cq);
-    while (size--) {
-        printf("%d) %s\n", i + 1, cq->words[i]);
+    int i = cq->r, k = 0, size = getsize(cq);
+    while (k < size) {
+        printf("%d) %s\n", ++k, cq->words[i]);
         i = (i - 1 + cq->n) % cq->n;
     }
     // printf("\n");
@@ -212,20 +215,24 @@ void display(cqueue* cq) {
 
 void resize(cqueue** cq, int size) {
 
-    // printf("resize to %d\n", size);
+    printf("resize to %d\n", size);
     if (size == (*cq)->n)
         return;
     
+    if (size < 0)
+        return;
+
     if (size < (*cq)->n) {
-        int drop = (*cq)->n - size;
+        int drop = getsize(*cq) - size;
+        // printf("dropping %d items\n", drop);
         while(drop--)
             pop(*cq);
     }
     
-    cqueue* newcq = (cqueue*)malloc(sizeof(cqueue));
-    init(newcq, size);
+    cqueue* newcq = create_cqueue(size);
 
-    int i = (*cq)->r, oldsize = getsize(*cq);
+    int i = (*cq)->f, oldsize = getsize(*cq);
+    // printf("adding %d items\n", oldsize);
     while (oldsize--) {
         push(newcq, (*cq)->words[i]);
         i = (i + 1) % (*cq)->n;
@@ -243,16 +250,19 @@ void resize(cqueue** cq, int size) {
 /******************** VARNAME DEREFERENCING HELPERS START *******************/
 
 char* dereference(const char* ovarname) {
-    if (ovarname == NULL || strcmp(ovarname, "\"\"") == 0)
+    if (ovarname == NULL)
         return "";
     char* const varname = clone_str(ovarname);
     if (varname[0] != '$')
         return varname;
-    char* out = get_var(varname + 1);
+    char* env_result = getenv(varname + 1);
+    if (env_result != NULL) 
+        return env_result;
+    char* out = get_dict_var(shell_vars, varname + 1);
     return out ? out : "";
 }
 
-void dereferences(char*** varnames, int n_varnames) {
+void dereference_tokens(char*** varnames, int n_varnames) {
     for (int i = 0; i < n_varnames; i++)
         (*varnames)[i] = dereference((*varnames)[i]);
 }
@@ -345,15 +355,6 @@ char* join(const char* str1, const char* str2, const char joiner) {
     joined[len1 + 1] = '\0';
     strcat(joined, str2);
     return joined;
-}
-
-void try_delim(const char* otoken, const char* delim) {
-    char* token = clone_str(otoken);
-    char** tokens = NULL;
-    int n_tokens = 0;
-    tokenize(token, delim, &tokens, &n_tokens);
-    char* joined = join(join("delimiting on", delim, ' '),"gives: ", ' ');
-    print_strings(tokens, n_tokens, ",", joined);
 }
 
 int redirect_fd_to_file(int fd, const char* file_name, const char* mode) {
@@ -494,22 +495,6 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
 /**************************** STRING HELPERS END *************************/
 
 /**
- * Return index at which word is present in list, else -1
- */
-int is_word_in_list(const char** list, const int size, const char* word) {
-    for (int i = 0; i < size; i++) {
-        if (strcmp(list[i], word) == 0) // found
-            return i;
-    }
-    return -1;
-}
-
-bool is_builtin(const char* command) {
-    int idx = is_word_in_list(builtins, n_builtins, command);
-    return (idx >=0 && idx < n_builtins);
-}
-
-/**
  * Get file name from its path
  * e.g. path/to/file1.txt -> file1.txt
  * e.g. /file2.txt -> file2.txt
@@ -531,83 +516,272 @@ char* get_filename_from_path(const char* path) {
     return strncpy(filename, path + i + 1, n);
 }
 
-/*************************** BUILT-IN CALLS START ***************************/
+/*************************** NON BUILT-IN CALLS START ************************/
 
-void wsh_cd(const char* odir) {
+int execute(char* path, char** argv) {
+    int pid = fork();
+    if (pid < 0) {
+        return -1;
+    } else if (pid == 0) {
+        execv(path, argv);
+        exit(-1);
+    } else {
+        if (waitpid(pid, 0, 0) == -1)
+            return -1;
+    }
+    return 0;
+}
+
+int handle_non_builtin(char** tokens, int n_tokens) {
+
+    // printf("handle non_built-in\n");
+    char* command = tokens[0];
+    char** argv = tokens;
+    n_tokens = n_tokens;
+
+    if (access(command, X_OK) == 0) {
+        argv[0] = get_filename_from_path(command);
+        return execute(command, argv);
+    }
+
+    char* path = getenv("PATH");
+    char** paths = NULL;
+    int n_paths = 0;
+    tokenize(path, ":", &paths, &n_paths);
+    for (int i = 0; i < n_paths; i++) {
+        char* newpath = join(paths[i], command, '/');
+        if (access(newpath, X_OK) == 0)
+            return execute(newpath, argv);
+    }
+
+    return -1;
+}
+
+/*************************** NON BUILT-IN CALLS START ************************/
+
+/***************************** BUILT-IN CALLS START ***************************/
+
+int wsh_cd(char** tokens, int n_tokens) {
+    if (n_tokens < 1 || n_tokens > 2)
+        return -1;
     // printf("wsh_cd() called\n");
+    char* odir = tokens[1];
     char* const dir = dereference(odir);
     // char* cwd = getcwd(NULL, 0);
     // printf("cwd before cd ../ = %s\n", cwd);
     // printf("running cd %s...\n", dir);
-    last_exit_code = chdir(dir);
+    if (chdir(dir) < 0)
+        return -1;
+    return 0;
     // cwd = getcwd(NULL, 0);
     // printf("last_exit_code = %d\n", last_exit_code);
     // printf("cwd after cd ../ = %s\n", cwd);
 }
 
-void wsh_exit() {
+int wsh_exit(char** tokens, int n_tokens) {
+    if (n_tokens != 1)
+        return -1;
     // printf("wsh_exit() called\n");
     // last_exit_code ? exit(EXIT_CODE_MINUS_ONE) : exit(EXIT_CODE_ZERO);
+    // printf("last_exit_code from wsh_exit() = %d\n", last_exit_code);
+    tokens = tokens;
     exit(last_exit_code);
+    return 0;
 }
 
-void wsh_export(const char* otoken) {
+// TODO(Areeb): [export a] should give error 
+int wsh_export(char** tokens, int n_tokens) {
+    if (n_tokens != 2)
+        return -1;
+    const char* otoken = tokens[1];
     // printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
     char* const key = strtok(token, "=");
-    char* const val = dereference(strtok(NULL, "="));
-    last_exit_code = setenv(key, val, 1);
+    const char* val = strtok(NULL, "=");
+    if (val == NULL) { // either [export abc] OR [export abc=] case
+        if (otoken[strlen(otoken) - 1] != '=') // [export abc] is invalid
+            return -1;
+        val = "";
+    }
+    val = dereference(val);
+    // printf("exporting %s=%s\n", key, val);
+    if(setenv(key, val, 1) < 0)
+        return -1;
     // printf("exported getenv(%s)=%s\n", key, getenv(key));
+    return 0;
     // print_vars();
 }
 
-void wsh_history() {
-    // printf("wsh_history() called\n");
-    display(history);
+int handle(char**, int);
+
+bool isValidNumber(const char* numstr) {
+    if (numstr == NULL || strlen(numstr) == 0)
+            return false;
+    char* buff = (char*)malloc((strlen(numstr) + 1) * sizeof(char));
+    strtol(numstr, &buff, 10);
+    if (strcmp(buff,"") != 0)
+        return false;
+    return true;
 }
 
-void wsh_local(const char* otoken) {
+int wsh_history(char** tokens, int n_tokens) {
+    // printf("wsh_history() called, n_tokens=%d\n", n_tokens);
+    // display(history);
+    if (n_tokens < 1 || n_tokens > 3)
+        return -1;
+
+    if (n_tokens == 1)
+        display(history);
+    else if (n_tokens == 3) {
+        if (strcmp(tokens[1],"set") != 0)
+            return -1;
+        if (!isValidNumber(tokens[2]))
+            return -1;
+        resize(&history, atoi(tokens[2]));
+    } else {
+        if (!isValidNumber(tokens[1]))
+            return -1;
+        int line_number = atoi(tokens[1]);
+        char* line = get(history, line_number);
+        if (line == NULL)
+            return 0;
+        // printf("executing from history: %s\n", line);
+        char** line_tokens = NULL;
+        int n_line_tokens = 0;
+        tokenize(line, " ", &line_tokens, &n_line_tokens);
+        return handle(line_tokens, n_line_tokens);
+    }
+    return 0;
+}
+
+// TODO(Areeb): [local a] should give error
+int wsh_local(char** tokens, int n_tokens) {
+    if (n_tokens != 2)
+        return -1;
+    const char* otoken = tokens[1];
     // printf("wsh_local() called\n");
     char* const token = clone_str(otoken);
     // printf("wsh_local(%s)\n", token);
     char* const key = strtok(token, "=");
     // printf("wsh_local key=%s\n", key);
-    char* const val = dereference(strtok(NULL, "="));
+    const char* val = strtok(NULL, "=");
+    if (val == NULL) { // either [local abc] OR [local abc=] case
+        if (otoken[strlen(otoken) - 1] != '=') // [local abc] is invalid
+            return -1;
+        val = "";
+    }
+    val = dereference(val);
     // printf("adding key:val as %s:%s\n", key, val);
-    add_shell_var(key, val);
+    if (add_dict_var(shell_vars, key, val) < 0)
+        return -1;
+    return 0;
     // print_vars();
 }
 
 int non_hidden_dirent(const struct dirent* entry) { return entry->d_name[0] != '.';}
 
-int wsh_ls() {
+int wsh_ls(char** tokens, int n_tokens) {
     // printf("wsh_ls() called\n");
+    if (n_tokens != 1)
+        return -1;
+    tokens = tokens;
     struct dirent** dirs;
     int n = scandir(".", &dirs, non_hidden_dirent, alphasort);
-    if (n == -1)
-        last_exit_code = EXIT_CODE_MINUS_ONE;
-    else {
-        for (int i = 0; i < n; i++)
-            printf("%s\n", dirs[i]->d_name);
-        fflush(stdout);
-        last_exit_code = EXIT_CODE_ZERO;
-    }
-    return last_exit_code;
+    if (n == -1)    
+        return -1;
+    for (int i = 0; i < n; i++)
+        printf("%s\n", dirs[i]->d_name);
+    fflush(stdout);
+    return 0;
 }
 
-void wsh_vars() {
+int wsh_vars(char** tokens, int n_tokens) {
     // printf("wsh_vars() called\n");
+    if (n_tokens != 1)
+        return -1;
+    tokens = tokens;
     for (int i = 0; i < shell_vars->size; i++) {
         entry* dict_entry = shell_vars->entries[i];
         printf("%s=%s\n", dict_entry->key, dict_entry->val);
     }
+    fflush(stdout);
+    return 0;
 }
+
+dict* builtins;
+
+bool is_builtin(const char* command) {
+    return get_dict_idx(builtins, command) != -1;
+}
+
+// static int (*wshcalls[])(char**,int) = {wsh_cd,wsh_exit,wsh_export,wsh_history,wsh_local,wsh_ls,wsh_vars};
+
+int handle_builtin(char** tokens, int n_tokens) {
+    char* command = tokens[0];
+    int idx = atoi(get_dict_var(builtins, command));
+    return wshcalls[idx](tokens, n_tokens);
+}
+
 
 /*************************** BUILT-IN CALLS END ****************************/
 
+int handle(char** tokens, int n_tokens) {
+
+    int exit_code = -1;
+    bool redirection = false;
+    
+    // Step 4: perform I/O redirection if any
+    exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
+    if (exit_code < 0)
+        return exit_code;
+
+    // perror("standard error message\n");
+    // printf("n_tokens after redirection: %d\n", n_tokens);
+    // print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
+
+    // Step 5: expand all variables
+    dereference_tokens(&tokens, n_tokens);
+    char* command = tokens[0];
+    // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
+
+    if (is_builtin(command))
+        exit_code = handle_builtin(tokens, n_tokens);
+    else
+        exit_code = handle_non_builtin(tokens, n_tokens);
+
+    // flush streams before next command
+    fflush(stdin);
+    fflush(NULL);
+
+    // reset any redirection
+    if (redirection) {
+        dup2(copy_in, STDIN_FILENO);
+        dup2(copy_out, STDOUT_FILENO);
+        dup2(copy_err, STDERR_FILENO);
+    }
+
+    return exit_code;
+}
+
+void force_exit() {
+    char* tokens[] = {"exit"};
+    wsh_exit(tokens, 1);
+}
+
+void init_builtins() {
+    builtins = create_dictionary(7);
+    add_dict_var(builtins, "cd",      "0");
+    add_dict_var(builtins, "exit",    "1");
+    add_dict_var(builtins, "export",  "2");
+    add_dict_var(builtins, "history", "3");
+    add_dict_var(builtins, "local",   "4");
+    add_dict_var(builtins, "ls",      "5");
+    add_dict_var(builtins, "vars",    "6");
+    // print_dict(builtins);
+}
+
 void init_history(int size) {
-    history = (cqueue*)malloc(sizeof(cqueue));
-    init(history, size);
+    history = create_cqueue(size);
 }
 
 void init_env_vars() {
@@ -615,10 +789,7 @@ void init_env_vars() {
 }
 
 void init_shell_vars() {
-    shell_vars = (dict*)malloc(sizeof(dict));
-    shell_vars->size = 0;
-    shell_vars->max_size = 1;
-    shell_vars->entries = (entry**)malloc(shell_vars->max_size * sizeof(entry*));
+    shell_vars = create_dictionary(5);
 }
 
 int main(int argc, char* argv[]) {
@@ -629,9 +800,9 @@ int main(int argc, char* argv[]) {
     if (argc < 1 || argc > 2)
         exit(-1);
 
-    int copy_in = dup(STDIN_FILENO);
-    int copy_out = dup(STDOUT_FILENO);
-    int copy_err = dup(STDERR_FILENO);
+    copy_in = dup(STDIN_FILENO);
+    copy_out = dup(STDOUT_FILENO);
+    copy_err = dup(STDERR_FILENO);
 
     fflush(stdin);
     fflush(NULL);
@@ -643,10 +814,11 @@ int main(int argc, char* argv[]) {
         wsh_prompt = "";
     }
 
-    init_history(5);
+    init_history(initial_history_size);
     // display(history);
     init_env_vars();
     init_shell_vars();
+    init_builtins();
     // print_vars();
 
     char *line = NULL;
@@ -676,14 +848,13 @@ int main(int argc, char* argv[]) {
         int n_tokens = 0;
         char** tokens = NULL;
         tokenize(line, " ", &tokens, &n_tokens);
-        char* command = tokens[0];
 
         // printf("command: %s\n", command);
         // printf("n_tokens: %d\n", n_tokens);
         // print_strings(tokens, n_tokens, ",", "tokens = ");
 
         // Step 3: record history for non built-in commands
-        if (!is_builtin(command)) {
+        if (!is_builtin(tokens[0])) {
             // record history
             // TODO(Areeb): display is reverse of what it should be
             // TODO(Areeb): local x=pwd; $x is not working
@@ -691,114 +862,8 @@ int main(int argc, char* argv[]) {
             // display(history);
         }
 
-        bool redirection = false;
-        // Step 4: perform I/O redirection if any
-        last_exit_code = handle_redirection_if_any(&tokens, &n_tokens, &redirection);
-        // perror("standard error message\n");
-        // printf("n_tokens after redirection: %d\n", n_tokens);
-        // print_strings(tokens, n_tokens, ",", "tokens after redirection = ");
-
-        // Step 5: expand all variables
-        dereferences(&tokens, n_tokens);
-        command = tokens[0];
-        // print_strings(tokens, n_tokens, ",", "tokens after expansion = ");
-
-        if (strcmp(command,"cd") == 0)
-            wsh_cd(tokens[1]);
-
-        // if (strcmp(command,"env") == 0)
-        //     print_environ();
-
-        if (strcmp(command, "exit") == 0)
-            wsh_exit();
-
-        if (strcmp(command, "export") == 0)
-            wsh_export(tokens[1]);
-
-        if (strcmp(command, "history") == 0)
-            wsh_history();
-
-        if (strcmp(command, "local") == 0)
-            wsh_local(tokens[1]);
-
-        if (strcmp(command, "ls") == 0)
-            wsh_ls();
-        
-        if (strcmp(command, "vars") == 0)
-            wsh_vars();
-
-        if (!is_builtin(command)) {
-            // printf("non built-in command, exec to execute\n");
-            last_exit_code = access(command, X_OK);
-            int can_execute = (last_exit_code == 0);
-            if (can_execute) {
-                // printf("can_execute = 0\n");
-                int pid = fork();
-                if (pid < 0)
-                    printf("fork failed!!\n");
-                else if (pid == 0) {
-                    char** argv = tokens;
-                    char* executable = get_filename_from_path(command);
-                    // printf("filename=%s, len=%ld\n", executable, strlen(executable));
-                    argv[0] = clone_str(executable);
-                    // printf("Child of wsh, exec into %s\n", executable);
-                    execv(command, argv);
-                    // printf("exec failed\n");
-                    exit(EXIT_FAILURE);
-                } else {
-                    int status = 0;;
-                    wait(&status);
-                    // printf("child complete, status=%d!\n", status);
-                    // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-                }
-            } else {
-                // printf("can not execute, try searching $PATH!!\n");
-                char* path = getenv("PATH");
-                // printf("PATH=%s\n", path);
-                char** paths = NULL;
-                int n_paths = 0;
-                tokenize(path, ":", &paths, &n_paths);
-                // print_strings(paths, n_paths, "\n", "PATH:\n");
-                for (int i = 0; i < n_paths; i++) {
-                    char* newpath = join(paths[i], command, '/');
-                    last_exit_code = access(newpath, X_OK);
-                    // printf("last_exit_code = %d\n", last_exit_code);
-                    // fflush(stdout);
-                    int can_execute = (last_exit_code == 0);
-                    if (can_execute) {
-                        int pid = fork();
-                        if (pid < 0)
-                            printf("fork failed!!\n");
-                        else if (pid == 0) {
-                            char** argv = tokens;
-                            // printf("newpath=%s, len=%ld\n", newpath, strlen(newpath));
-                            // printf("Child of wsh, exec into %s\n", command);
-                            // print_strings(argv, n_tokens, ",", "with argv = ");
-                            execv(newpath, argv);
-                            // printf("exec failed\n");
-                            exit(EXIT_FAILURE);
-                        } else {
-                            int status = 0;;
-                            wait(&status);
-                            break;
-                            // printf("child complete, status=%d!\n", status);
-                            // printf("WEXITSTATUS=%d\n", WEXITSTATUS(status));
-                        }
-                    }
-                }
-            }
-        }
-
-        // flush sreams before next command
-        fflush(stdin);
-        fflush(NULL);
-
-        // reset any redirection
-        if (redirection) {
-            dup2(copy_in, STDIN_FILENO);
-            dup2(copy_out, STDOUT_FILENO);
-            dup2(copy_err, STDERR_FILENO);
-        }
+        last_exit_code = handle(tokens, n_tokens);
+        // printf("last_exit_code = %d\n", last_exit_code);
 
         promptf("");
 
@@ -807,7 +872,7 @@ int main(int argc, char* argv[]) {
         len = 0;
     }
 
-    wsh_exit();
+    force_exit();
     // printf("\n");
     return 0;
 }

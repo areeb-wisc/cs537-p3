@@ -8,7 +8,7 @@ SRC = $(TARGET).c
 HEADER = $(TARGET).h
 
 LOGIN = areeb
-SUBMITPATH = ~cs537-1/handin/$(LOGIN)/
+SUBMITPATH = ~cs537-1/handin/$(LOGIN)
 
 all: $(TARGET) $(TARGET)-dbg
 
@@ -19,7 +19,7 @@ $(TARGET)-dbg: $(SRC) $(HEADER)
 	$(CC) $(CFLAGS-dbg) $< -o $@
 
 clean:
-	rm -f $(TARGET) $(TARGET)-dbg
+	rm -f $(TARGET) $(TARGET)-dbg dict envtest cqueue
 
 dict: dict.c dict.h
 	$(CC) $(CFLAGS) $< -o $@
@@ -29,3 +29,15 @@ envtest: envtest.c dict.c dict.h
 
 cqueue: cqueue.c
 	$(CC) $(CFLAGS) $< -o $@
+
+submit: clean
+	rm -rf $(SUBMITPATH)/p3;\
+	mkdir $(SUBMITPATH)/p3;\
+	cd ../;\
+	cp -r . $(SUBMITPATH)/p3/;\
+	cd solution
+
+test:
+	cd ../tests/;\
+	./run-tests.sh;\
+	cd ../solution/

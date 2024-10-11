@@ -47,7 +47,28 @@ void trial2(char* file_name) {
 }
 
 int main() {
-    trial1("output1.txt");
+
+    int pid = fork();
+
+    if (pid < 0)
+        printf("error\n");
+    else if(pid == 0) {
+        printf("In CHILD\n");
+        printf("My PID = %d\n", getpid());
+        printf("Parent PID = %d\n", getppid());
+        exit(0);
+    } else {
+        // sleep(10);
+        wait(0);
+        printf("In PARENT\n");
+        printf("My PID = %d\n", getpid());
+        printf("Child PID = %d\n", pid);
+    }
+
+    printf("Common message\n");
+
+    // printf("hello\n");
+    // trial1("output1.txt");
     // trial2("output2.txt");
     return 0;
 }

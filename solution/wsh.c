@@ -20,7 +20,7 @@ dict* shell_vars; // --------------------- dictionary to hold shell local variab
 cqueue* history; // ---------------------- circular queue to store history
 dict* builtins; // ----------------------- dictionary to hold builtins
 
-/******************************* DICTIONARY START *****************************/
+// ------------------------------- DICTIONARY START -------------------------------
 
 dict* create_dictionary(int maxsize) {
     dict* dictionary = (dict*)malloc(sizeof(dict));
@@ -79,9 +79,9 @@ char* get_dict_var(dict* dictionary, const char* key) {
     return (idx != -1) ? clone_str(dictionary->entries[idx]->val) : NULL;
 }
 
-/********************************** DICTIONARY END *******************************/
+// -------------------------------- DICTIONARY END --------------------------------
 
-/***************************** HISTORY START **********************************/
+// -------------------------------- HISTORY START ---------------------------------
 
 cqueue* create_cqueue(int size) {
     cqueue* cq = (cqueue*)malloc(sizeof(cqueue));
@@ -178,9 +178,9 @@ void resize(cqueue** cq, int size) {
     *cq = newcq;
 }
 
-/**************************** HISTORY END ************************************/
+// --------------------------------- HISTORY END ----------------------------------
 
-/******************** VARNAME DEREFERENCING HELPERS START *******************/
+// --------------------- VARNAME DEREFERENCING HELPERS START ----------------------
 
 char* dereference(const char* ovarname) {
     if (ovarname == NULL)
@@ -200,9 +200,9 @@ void dereference_tokens(char*** varnames, int n_varnames) {
         (*varnames)[i] = dereference((*varnames)[i]);
 }
 
-/********************* VARNAME DEREFERENCING HELPERS END ********************/
+// ---------------------- VARNAME DEREFERENCING HELPERS END -----------------------
 
-/******************************* STRING HELPERS START ****************************/
+// ----------------------------- STRING HELPERS START -----------------------------
 
 char* clone_str(const char* str) {
     char* clone = (char*)malloc((strlen(str) + 1) * sizeof(char));
@@ -387,8 +387,6 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
     return 0;
 }
 
-/**************************** STRING HELPERS END *************************/
-
 /**
  * Get file name from its path
  * e.g. path/to/file1.txt -> file1.txt
@@ -408,7 +406,9 @@ char* get_filename_from_path(const char* path) {
     return strncpy(filename, path + i + 1, n);
 }
 
-/*************************** NON BUILT-IN CALLS START ************************/
+// ------------------------------ STRING HELPERS END ------------------------------
+
+// --------------------------- NON BUILT-IN CALLS START ---------------------------
 
 int execute(char* path, char** argv) {
     int pid = fork();
@@ -444,9 +444,9 @@ int handle_non_builtin(char** tokens, int n_tokens) {
     return -1;
 }
 
-/*************************** NON BUILT-IN CALLS START ************************/
+// ---------------------------- NON BUILT-IN CALLS END ----------------------------
 
-/***************************** BUILT-IN CALLS START ***************************/
+// ----------------------------- BUILT-IN CALLS START -----------------------------
 
 bool isValidNumber(const char* numstr) {
     if (numstr == NULL || strlen(numstr) == 0)
@@ -579,9 +579,9 @@ int handle_builtin(char** tokens, int n_tokens) {
     return wshcalls[idx](tokens, n_tokens);
 }
 
-/*************************** BUILT-IN CALLS END ****************************/
+// ------------------------------ BUILT-IN CALLS END ------------------------------
 
-/*************************** MAIN HELPERS START ****************************/
+// ------------------------------ MAIN HELPERS START ------------------------------
 
 int reset_redirection() {
     if (dup2(copy_in, STDIN_FILENO) < 0)
@@ -642,7 +642,7 @@ void init_env_vars() { last_exit_code = putenv("PATH=/bin"); }
 
 void init_shell_vars() { shell_vars = create_dictionary(5); }
 
-/*************************** MAIN HELPERS END ****************************/
+// ------------------------------- MAIN HELPERS END -------------------------------
 
 int main(int argc, char* argv[]) {
     if (argc < 1 || argc > 2)

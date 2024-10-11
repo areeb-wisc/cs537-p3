@@ -90,6 +90,8 @@ int add_dict_var(dict* dictionary, const char* key, const char* val) {
 }
 
 char* get_dict_var(dict* dictionary, const char* key) {
+    if (key == NULL)
+        return NULL;
     int idx = get_dict_idx(dictionary, key);
     return (idx != -1) ? clone_str(dictionary->entries[idx]->val) : NULL;
 }
@@ -248,7 +250,7 @@ void resize(cqueue** cq, int size) {
 /******************** VARNAME DEREFERENCING HELPERS START *******************/
 
 char* dereference(const char* ovarname) {
-    if (ovarname == NULL || strcmp(ovarname, "\"\"") == 0)
+    if (ovarname == NULL)
         return "";
     char* const varname = clone_str(ovarname);
     if (varname[0] != '$')
@@ -595,11 +597,18 @@ int wsh_export(char** tokens, int n_tokens) {
     // printf("wsh_export() called\n");
     char* const token = clone_str(otoken);
     char* const key = strtok(token, "=");
-    char* const val = dereference(strtok(NULL, "="));
+    const char* val = strtok(NULL, "=");
+    if (val == NULL) { // either [export abc] OR [export abc=] case
+        if (otoken[strlen(otoken) - 1] != '=') // [export abc] is invalid
+            return -1;
+        val = "";
+    }
+    val = dereference(val);
+    // printf("exporting %s=%s\n", key, val);
     if(setenv(key, val, 1) < 0)
         return -1;
-    return 0;
     // printf("exported getenv(%s)=%s\n", key, getenv(key));
+    return 0;
     // print_vars();
 }
 
@@ -655,7 +664,13 @@ int wsh_local(char** tokens, int n_tokens) {
     // printf("wsh_local(%s)\n", token);
     char* const key = strtok(token, "=");
     // printf("wsh_local key=%s\n", key);
-    char* const val = dereference(strtok(NULL, "="));
+    const char* val = strtok(NULL, "=");
+    if (val == NULL) { // either [local abc] OR [local abc=] case
+        if (otoken[strlen(otoken) - 1] != '=') // [local abc] is invalid
+            return -1;
+        val = "";
+    }
+    val = dereference(val);
     // printf("adding key:val as %s:%s\n", key, val);
     if (add_dict_var(shell_vars, key, val) < 0)
         return -1;

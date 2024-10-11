@@ -31,8 +31,10 @@ dict* create_dictionary(int maxsize) {
 }
 
 void free_dict(dict* dictionary) {
-    for (int i = 0; i < dictionary->size; i++)
-        free(dictionary->entries[i]);
+    for (int i = 0; i < dictionary->size; i++) {
+        if (dictionary->entries[i])
+            free(dictionary->entries[i]);
+    }
     free(dictionary->entries);
     free(dictionary);
 }
@@ -93,8 +95,10 @@ cqueue* create_cqueue(int size) {
 }
 
 void free_cq(cqueue* cq) {
-    for (int  i = 0; i < cq->n; i++)
-        free(cq->words[i]);
+    for (int  i = 0; i < cq->n; i++) {
+        if (cq->words[i])
+            free(cq->words[i]);
+    }
     free(cq->words);
     free(cq);
 }
@@ -365,6 +369,7 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
             strncpy(fdstr, last_token, len_fd);
             fd = atoi(fdstr);
+            free(fdstr);
         }
         fflush(stdin);
         if (redirect_fd_to_file(fd, file_name, "r") < 0)
@@ -376,6 +381,10 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
         *n_tokens -= 1;
     }
     *success = redirection;
+    // if (last_token)
+    //     free(last_token);
+    // if (file_name)
+    //     free(file_name);
     return 0;
 }
 
@@ -417,23 +426,33 @@ int execute(char* path, char** argv) {
 }
 
 int handle_non_builtin(char** tokens, int n_tokens) {
+    int exit_code = -1;
     char* command = tokens[0];
     char** argv = tokens;
     n_tokens = n_tokens;
     if (access(command, X_OK) == 0) {
         argv[0] = get_filename_from_path(command);
-        return execute(command, argv);
+        exit_code = execute(command, argv);
+    } else  {
+        char* path = getenv("PATH");
+        char** paths = NULL;
+        int n_paths = 0;
+        tokenize(path, ":", &paths, &n_paths);
+        bool found = false;
+        for (int i = 0; i < n_paths; i++) {
+            char* newpath = join(paths[i], command, '/');
+            if (access(newpath, X_OK) == 0) {
+                found = true;
+                exit_code = execute(newpath, argv);
+            }
+            // free(newpath);
+            if (found)
+                break;
+        }
+        // free(paths);
     }
-    char* path = getenv("PATH");
-    char** paths = NULL;
-    int n_paths = 0;
-    tokenize(path, ":", &paths, &n_paths);
-    for (int i = 0; i < n_paths; i++) {
-        char* newpath = join(paths[i], command, '/');
-        if (access(newpath, X_OK) == 0)
-            return execute(newpath, argv);
-    }
-    return -1;
+    free(command);
+    return exit_code;
 }
 
 // ---------------------------- NON BUILT-IN CALLS END ----------------------------
@@ -457,6 +476,7 @@ int wsh_cd(char** tokens, int n_tokens) {
     char* const dir = dereference(odir);
     if (chdir(dir) < 0)
         return -1;
+    free(dir);
     return 0;
 }
 
@@ -486,6 +506,8 @@ int wsh_export(char** tokens, int n_tokens) {
     val = dereference(val);
     if(setenv(key, val, 1) < 0)
         return -1;
+    free(token);
+    free(key);
     return 0;
 }
 
@@ -679,6 +701,9 @@ int main(int argc, char* argv[]) {
         last_exit_code = handle(tokens, n_tokens);
         promptf("");
         free(line); line = NULL; len = 0;
+        for (int i = 0; i < n_tokens; i++)
+            free(tokens[i]);
+        free(tokens);
     }
     force_exit();
     return 0;

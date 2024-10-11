@@ -30,6 +30,13 @@ dict* create_dictionary(int maxsize) {
     return dictionary;
 }
 
+void free_dict(dict* dictionary) {
+    for (int i = 0; i < dictionary->size; i++)
+        free(dictionary->entries[i]);
+    free(dictionary->entries);
+    free(dictionary);
+}
+
 entry* make_dict_entry(const char* key, const char* val) {
     entry* new_entry = (entry*)malloc(sizeof(entry));
     new_entry->key = clone_str(key);
@@ -85,7 +92,12 @@ cqueue* create_cqueue(int size) {
     return cq;
 }
 
-cqueue* history;
+void free_cq(cqueue* cq) {
+    for (int  i = 0; i < cq->n; i++)
+        free(cq->words[i]);
+    free(cq->words);
+    free(cq);
+}
 
 char* get(cqueue* cq, int no) {
     if (no < 1 || no > cq->n)
@@ -167,7 +179,6 @@ void resize(cqueue** cq, int size) {
 }
 
 /**************************** HISTORY END ************************************/
-
 
 /******************** VARNAME DEREFERENCING HELPERS START *******************/
 
@@ -437,6 +448,16 @@ int handle_non_builtin(char** tokens, int n_tokens) {
 
 /***************************** BUILT-IN CALLS START ***************************/
 
+bool isValidNumber(const char* numstr) {
+    if (numstr == NULL || strlen(numstr) == 0)
+            return false;
+    char* buff = (char*)malloc((strlen(numstr) + 1) * sizeof(char));
+    strtol(numstr, &buff, 10);
+    if (strcmp(buff,"") != 0)
+        return false;
+    return true;
+}
+
 int wsh_cd(char** tokens, int n_tokens) {
     if (n_tokens < 1 || n_tokens > 2)
         return -1;
@@ -451,6 +472,9 @@ int wsh_exit(char** tokens, int n_tokens) {
     if (n_tokens != 1)
         return -1;
     tokens = tokens;
+    free_dict(shell_vars);
+    free_dict(builtins);
+    free_cq(history);
     exit(last_exit_code);
     return 0;
 }
@@ -471,16 +495,6 @@ int wsh_export(char** tokens, int n_tokens) {
     if(setenv(key, val, 1) < 0)
         return -1;
     return 0;
-}
-
-bool isValidNumber(const char* numstr) {
-    if (numstr == NULL || strlen(numstr) == 0)
-            return false;
-    char* buff = (char*)malloc((strlen(numstr) + 1) * sizeof(char));
-    strtol(numstr, &buff, 10);
-    if (strcmp(buff,"") != 0)
-        return false;
-    return true;
 }
 
 int wsh_history(char** tokens, int n_tokens) {

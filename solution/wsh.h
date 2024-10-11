@@ -35,6 +35,9 @@ typedef struct Dict {
 // Create a dictionary with given size
 dict* create_dictionary(int size);
 
+// Free memory taken by dictionary
+void free_dict(dict* dictionary);
+
 // Make Entry (key,val)
 entry* make_dict_entry(const char* key, const char* val);
 
@@ -50,11 +53,6 @@ int add_dict_var(dict* dictionary, const char* key, const char* val);
 // Get dictionary[key] if present, else NULL
 char* get_dict_var(dict* dictionary, const char* key);
 
-// TODO(Areeb): remove these later
-void print_strings(char**, int, char*, char*);
-void print_environ();
-void print_dict(dict*);
-void print_vars();
 /********************************** DICTIONARY END *******************************/
 
 /***************************** CIRCULAR QUEUE START **********************************/
@@ -72,6 +70,9 @@ typedef struct circular_queue {
 
 // Create circular queue of given size
 cqueue* create_cqueue(int);
+
+// Free memory taken by cq
+void free_cq(cqueue* cq);
 
 // Get 1-indexed k-th element from cqueue counting from front to rear
 char* get(cqueue*, int k);
@@ -174,13 +175,10 @@ int non_hidden_dirent(const struct dirent* entry);
  * int (char** tokens, int n_tokens);
  * Return -1 for failure, 0 for success
  */
-
 int wsh_cd(char**,int);
 int wsh_exit(char** tokens, int n_tokens);
-// TODO(Areeb): [export a] should give error 
 int wsh_export(char**,int);
 int wsh_history(char**,int);
-// TODO(Areeb): [local a] should give error
 int wsh_local(char**,int);
 int wsh_ls(char**,int);
 int wsh_vars(char**,int);

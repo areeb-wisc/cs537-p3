@@ -30,7 +30,7 @@ envtest: envtest.c dict.c dict.h
 cqueue: cqueue.c
 	$(CC) $(CFLAGS) $< -o $@
 
-submit:
+submit: clean
 	rm -rf $(SUBMITPATH)/p3;\
 	mkdir $(SUBMITPATH)/p3;\
 	cd ../;\

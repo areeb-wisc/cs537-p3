@@ -348,6 +348,8 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             int len_fd = found2 - last_token;
             char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
             strncpy(fdstr, last_token, len_fd);
+            if (!isValidNumber(fdstr))
+                return -1;
             fd = atoi(fdstr);
         }
         fflush(stdout);
@@ -364,6 +366,8 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success) {
             int len_fd = found3 - last_token;
             char* fdstr = (char*)malloc((len_fd + 1) * sizeof(char));
             strncpy(fdstr, last_token, len_fd);
+            if (!isValidNumber(fdstr))
+                return -1;
             fd = atoi(fdstr);
         }
         fflush(stdin);

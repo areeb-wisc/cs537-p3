@@ -414,8 +414,12 @@ int execute(char* path, char** argv) {
         execv(path, argv);
         exit(-1);
     } else {
-        if (waitpid(pid, 0, 0) == -1)
+        int status = 0;
+        if (waitpid(pid, &status, 0) == -1)
             return -1;
+        if (WIFEXITED(status) != 1)
+            return -1;
+        return WEXITSTATUS(status);
     }
     return 0;
 }

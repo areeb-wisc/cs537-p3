@@ -2,3 +2,4 @@ tests/tests/*.err
 tests/tests/*.out
 tests/tests/*.rc
 tests/tests-out/
+.vscode/

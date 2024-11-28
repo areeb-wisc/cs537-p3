@@ -12,7 +12,7 @@
 #include<sys/wait.h>
 #include<unistd.h>
 
-/******************************* DICTIONARY START *****************************/
+// ------------------------------- DICTIONARY START -------------------------------
 
 // single dictionary entry (string key, string val) 
 typedef struct Entry {
@@ -35,6 +35,9 @@ typedef struct Dict {
 // Create a dictionary with given size
 dict* create_dictionary(int size);
 
+// Free memory taken by dictionary
+void free_dict(dict* dictionary);
+
 // Make Entry (key,val)
 entry* make_dict_entry(const char* key, const char* val);
 
@@ -50,14 +53,9 @@ int add_dict_var(dict* dictionary, const char* key, const char* val);
 // Get dictionary[key] if present, else NULL
 char* get_dict_var(dict* dictionary, const char* key);
 
-// TODO(Areeb): remove these later
-void print_strings(char**, int, char*, char*);
-void print_environ();
-void print_dict(dict*);
-void print_vars();
-/********************************** DICTIONARY END *******************************/
+// -------------------------------- DICTIONARY END --------------------------------
 
-/***************************** CIRCULAR QUEUE START **********************************/
+// ----------------------------- CIRCULAR QUEUE START -----------------------------
 
 /**
  * A circular queue where each entry is a string (called word)
@@ -72,6 +70,9 @@ typedef struct circular_queue {
 
 // Create circular queue of given size
 cqueue* create_cqueue(int);
+
+// Free memory taken by cq
+void free_cq(cqueue* cq);
 
 // Get 1-indexed k-th element from cqueue counting from front to rear
 char* get(cqueue*, int k);
@@ -93,17 +94,20 @@ void resize(cqueue**, int newsize);
 
 // TODO(Areeb): remove this
 void print(cqueue*, int);
-/**************************** CIRCULAR QUEUE END ************************************/
 
-/******************** VARNAME DEREFERENCING HELPERS START *******************/
+// ------------------------------ CIRCULAR QUEUE END ------------------------------
+
+// --------------------- VARNAME DEREFERENCING HELPERS START ----------------------
+
 // Dereference single variable
 char* dereference(const char*);
 
 // Dereference a list of variables
 void dereference_tokens(char*** varnames, int n_varnames);
-/********************* VARNAME DEREFERENCING HELPERS END ********************/
 
-/******************************* STRING HELPERS START ****************************/
+// ---------------------- VARNAME DEREFERENCING HELPERS END -----------------------
+
+// ----------------------------- STRING HELPERS START -----------------------------
 
 // Clone a string
 char* clone_str(const char*);
@@ -151,9 +155,11 @@ int handle_redirection_if_any(char*** tokens, int* n_tokens, bool* success);
  * e.g. / -> [empty string]
  */
 char* get_filename_from_path(const char* path);
-/**************************** STRING HELPERS END *************************/
 
-/*************************** NON BUILT-IN CALLS START ************************/
+// ------------------------------ STRING HELPERS END ------------------------------
+
+// --------------------------- NON BUILT-IN CALLS START ---------------------------
+
 // Call fork(), exec(path,argv)
 int execute(char* path, char** argv);
 
@@ -162,9 +168,10 @@ int execute(char* path, char** argv);
  * Then try executing by searching PATH directories
  */
 int handle_non_builtin(char** tokens, int n_tokens);
-/*************************** NON BUILT-IN CALLS START ************************/
 
-/***************************** BUILT-IN CALLS START ***************************/
+// ---------------------------- NON BUILT-IN CALLS END ----------------------------
+
+// ----------------------------- BUILT-IN CALLS START -----------------------------
 
 bool isValidNumber(const char* numstr);
 int non_hidden_dirent(const struct dirent* entry);
@@ -174,13 +181,10 @@ int non_hidden_dirent(const struct dirent* entry);
  * int (char** tokens, int n_tokens);
  * Return -1 for failure, 0 for success
  */
-
 int wsh_cd(char**,int);
 int wsh_exit(char** tokens, int n_tokens);
-// TODO(Areeb): [export a] should give error 
 int wsh_export(char**,int);
 int wsh_history(char**,int);
-// TODO(Areeb): [local a] should give error
 int wsh_local(char**,int);
 int wsh_ls(char**,int);
 int wsh_vars(char**,int);
@@ -197,9 +201,10 @@ bool is_builtin(const char* command);
  * Step 2: Call correct built-in function using wshcalls[]
  */
 int handle_builtin(char**,int);
-/*************************** BUILT-IN CALLS END ****************************/
 
-/*************************** MAIN DECLARATIONS ****************************/
+// ------------------------------ BUILT-IN CALLS END ------------------------------
+
+// ------------------------------ MAIN HELPERS START ------------------------------
 
 // generic handler for any command
 int handle(char** tokens, int n_tokens);
@@ -218,5 +223,7 @@ void init_shell_vars();
 
 // call exit for Ctrl+D or EOF
 void force_exit();
+
+// ------------------------------- MAIN HELPERS END -------------------------------
 
 #endif

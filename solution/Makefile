@@ -19,16 +19,7 @@ $(TARGET)-dbg: $(SRC) $(HEADER)
 	$(CC) $(CFLAGS-dbg) $< -o $@
 
 clean:
-	rm -f $(TARGET) $(TARGET)-dbg dict envtest cqueue
-
-dict: dict.c dict.h
-	$(CC) $(CFLAGS) $< -o $@
-
-envtest: envtest.c dict.c dict.h
-	$(CC) $(CFLAGS) $^ -o $@
-
-cqueue: cqueue.c
-	$(CC) $(CFLAGS) $< -o $@
+	rm -f $(TARGET) $(TARGET)-dbg
 
 submit: clean
 	rm -rf $(SUBMITPATH)/p3;\
@@ -39,5 +30,6 @@ submit: clean
 
 test:
 	cd ../tests/;\
-	./run-tests.sh;\
+	chmod +x run-tests.sh;\
+	./run-tests.sh -c;\
 	cd ../solution/
